@@ -1,7 +1,9 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import {
   ArrowRight,
+  AlertTriangle,
   BarChart3,
   Bell,
   BookOpen,
@@ -25,6 +27,7 @@ import {
   PieChart,
   Moon,
   Play,
+  Plus,
   Search,
   Send,
   Shield,
@@ -35,6 +38,7 @@ import {
   Sun,
   UserRound,
   UserCog,
+  UserPlus,
   Users,
   Video,
   X,
@@ -43,15 +47,17 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
 type Lang = "kk" | "ru";
 type Theme = "light" | "dark";
-type Role = "student" | "teacher" | "psychologist" | "admin";
-type Section = "home" | "chat" | "lessons" | "test" | "library" | "progress" | "classes" | "observations" | "students" | "reports" | "cases" | "meetings" | "analytics" | "users" | "settings";
-type DemoAccount = { login: string; password: string; role: Role; name: string; initials: string; meta: { ru: string; kk: string } };
+type Role = "student" | "teacher" | "psychologist" | "admin" | "site_admin";
+type Section = "home" | "chat" | "lessons" | "test" | "library" | "progress" | "classes" | "observations" | "students" | "reports" | "cases" | "meetings" | "analytics" | "users" | "settings" | "accounts" | "support";
+type Account = { id?: string; login: string; password: string; role: Role; name: string; initials: string; meta: { ru: string; kk: string }; classNumber?: string; classLetter?: string };
+declare global { interface Window { puter?: { ai: { chat: (messages: { role: string; content: string }[], options?: { model?: string }) => Promise<unknown> } }; } }
 
-const demoAccounts: DemoAccount[] = [
+const demoAccounts: Account[] = [
   { login: "student", password: "Student123!", role: "student", name: "Аян Серік", initials: "АС", meta: { ru: "7 «А» класс", kk: "7 «А» сынып" } },
   { login: "teacher", password: "Teacher123!", role: "teacher", name: "Данияр Қасымов", initials: "ДҚ", meta: { ru: "Классный руководитель · 7 «А»", kk: "Сынып жетекшісі · 7 «А»" } },
   { login: "psychologist", password: "Psycho123!", role: "psychologist", name: "Айгүл Омарова", initials: "АО", meta: { ru: "Школьный психолог", kk: "Мектеп психологы" } },
   { login: "admin", password: "Admin123!", role: "admin", name: "Гүлмира Әлиева", initials: "ГӘ", meta: { ru: "Администратор школы · завуч", kk: "Мектеп әкімшісі · директор орынбасары" } },
+  { login: "bolatbekovameruert@gmail.com", password: "Meruert2026!", role: "site_admin", name: "Меруерт Болатбекова", initials: "МБ", meta: { ru: "Учитель · администратор сайта", kk: "Мұғалім · сайт әкімшісі" } },
 ];
 
 const copy = {
@@ -136,17 +142,20 @@ const featureData = {
   ],
 } as const;
 
-const lessons = [
-  { age: "1–4", title: "Добрые и недобрые шутки", time: "6 мин", color: "coral" },
-  { age: "5–7", title: "Как распознать буллинг", time: "9 мин", color: "lime" },
-  { age: "8–11", title: "Личные границы онлайн", time: "12 мин", color: "blue" },
-];
+const youtubeLessons = [
+  { id: "EW7vUc43N8E", title: "Буллингке қарсы бағытталған ролик", author: "Jastar Bilsin" },
+  { id: "7bD9FQR3QkA", title: "«Менің сыныбым буллингке қарсы»", author: "Мир детства" },
+  { id: "Sa1nK8yvIag", title: "Буллинг жасаған сынып", author: "БӘРІ ОСЫНДАЙ ВИДЕО" },
+  { id: "RCA_wFW-mSo", title: "Әлімжеттік, буллинг туралы мағұлмат", author: "Мектеп өмірінен" },
+].map((video) => ({ ...video, thumbnail: `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg` }));
 
 export default function QorgauAIApp() {
   const [lang, setLang] = useState<Lang>("ru");
   const [theme, setTheme] = useState<Theme>("light");
   const [loginOpen, setLoginOpen] = useState(false);
-  const [activeAccount, setActiveAccount] = useState<DemoAccount | null>(null);
+  const [activeAccount, setActiveAccount] = useState<Account | null>(null);
+  const [createdAccounts, setCreatedAccounts] = useState<Account[]>(() => { if (typeof window === "undefined") return []; try { return JSON.parse(localStorage.getItem("qorgau-created-accounts") || "[]"); } catch { return []; } });
+  const [activeVideo, setActiveVideo] = useState<(typeof youtubeLessons)[number] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [section, setSection] = useState<Section>("home");
   const [error, setError] = useState("");
@@ -158,6 +167,7 @@ export default function QorgauAIApp() {
     localStorage.setItem("ss-theme", theme);
     localStorage.setItem("ss-lang", lang);
   }, [theme, lang]);
+  function saveCreatedAccounts(accounts: Account[]) { setCreatedAccounts(accounts); localStorage.setItem("qorgau-created-accounts", JSON.stringify(accounts)); }
 
   function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -168,7 +178,7 @@ export default function QorgauAIApp() {
       setError(t.error);
       return;
     }
-    const account = demoAccounts.find((item) => item.login === login && item.password === password);
+    const account = [...demoAccounts, ...createdAccounts].find((item) => item.login.toLowerCase() === login && item.password === password);
     if (!account) {
       setError(lang === "ru" ? "Неверный логин или пароль." : "Логин немесе құпиясөз қате.");
       return;
@@ -192,6 +202,8 @@ export default function QorgauAIApp() {
         onTheme={() => setTheme(theme === "light" ? "dark" : "light")}
         onLang={() => setLang(lang === "ru" ? "kk" : "ru")}
         onLogout={() => { setActiveAccount(null); setSection("home"); }}
+        createdAccounts={createdAccounts}
+        onAccountsChange={saveCreatedAccounts}
       />
     );
   }
@@ -259,7 +271,7 @@ export default function QorgauAIApp() {
         <section className="features-section section-pad" id="features">
           <div className="section-heading"><div><span>{lang === "ru" ? "Возможности" : "Мүмкіндіктер"}</span><h2>{t.featuresTitle}</h2></div><p>{lang === "ru" ? "Разные форматы помощи — для разных ситуаций и возрастов." : "Әртүрлі жағдай мен жасқа арналған көмек форматтары."}</p></div>
           <div className="feature-grid">
-            {featureData[lang].map(([Icon, title, text], index) => <article className={`feature-card feature-${index + 1}`} key={title}><div className="feature-icon"><Icon size={25} /></div><span>0{index + 1}</span><h3>{title}</h3><p>{text}</p><button aria-label={title}><ArrowRight size={18} /></button></article>)}
+            {featureData[lang].map(([Icon, title, text], index) => <article className={`feature-card feature-${index + 1}`} key={title}><div className="feature-icon"><Icon size={25} /></div><span>0{index + 1}</span><h3>{title}</h3><p>{text}</p><button aria-label={title} onClick={() => index === 1 ? document.querySelector("#resources")?.scrollIntoView({ behavior: "smooth" }) : setLoginOpen(true)}><ArrowRight size={18} /></button></article>)}
           </div>
         </section>
 
@@ -272,9 +284,7 @@ export default function QorgauAIApp() {
 
         <section className="resources-section section-pad" id="resources">
           <div className="section-heading"><div><span>{lang === "ru" ? "Видеотека" : "Бейнеқор"}</span><h2>{t.resourcesTitle}</h2></div><button className="text-button" onClick={() => setLoginOpen(true)}>{lang === "ru" ? "Все материалы" : "Барлық материал"}<ArrowRight size={18} /></button></div>
-          <div className="lesson-grid">
-            {lessons.map((lesson, index) => <article className="lesson-card" key={lesson.title}><div className={`lesson-cover ${lesson.color}`}><span>{lesson.age} {lang === "ru" ? "класс" : "сынып"}</span><button aria-label="Бейнені ойнату"><Play fill="currentColor" size={23} /></button><div className="cover-shape shape-a" /><div className="cover-shape shape-b" /></div><div className="lesson-body"><span>{lang === "ru" ? `Урок ${index + 1}` : `${index + 1}-сабақ`}</span><h3>{lang === "ru" ? lesson.title : ["Жақсы және жаман әзіл", "Буллингті қалай танимыз", "Интернеттегі жеке шекара"][index]}</h3><p><Clock3 size={15} />{lesson.time}</p></div></article>)}
-          </div>
+          <VideoCards videos={youtubeLessons} lang={lang} onPlay={setActiveVideo} />
         </section>
 
         <section className="cta-section section-pad">
@@ -285,17 +295,22 @@ export default function QorgauAIApp() {
       <footer><a className="brand" href="#top"><span className="brand-mark"><ShieldCheck size={22} /></span><span>Qorgau AI</span></a><p>{t.footer}</p><div><a href="#about">{lang === "ru" ? "Конфиденциальность" : "Құпиялық"}</a><a href="#resources">{lang === "ru" ? "Материалы" : "Материалдар"}</a></div></footer>
 
       {loginOpen && <div className="modal-backdrop"><div className="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="modal-close" onClick={() => setLoginOpen(false)} aria-label="Жабу"><X size={21} /></button><div className="modal-brand"><span className="brand-mark"><ShieldCheck size={23} /></span><span>Qorgau AI</span></div><div className="modal-icon"><LockKeyhole size={26} /></div><h2 id="login-title">{t.modalTitle}</h2><p>{t.modalText}</p><form onSubmit={submitLogin}><label>{t.username}<input name="login" autoComplete="username" placeholder={lang === "ru" ? "Введите логин" : "Логинді енгізіңіз"} /></label><label>{t.password}<input name="password" type="password" autoComplete="current-password" placeholder="••••••••" /></label><div className="form-meta"><label className="checkbox"><input type="checkbox" />{t.remember}</label><a href="#help">{lang === "ru" ? "Нужна помощь?" : "Көмек керек пе?"}</a></div>{error && <div className="form-error" role="alert"><CircleHelp size={17} />{error}</div>}<button className="primary-button modal-submit" type="submit">{t.enter}<ArrowRight size={18} /></button></form><div className="modal-note"><ShieldCheck size={17} />{lang === "ru" ? "Защищённое соединение" : "Қорғалған байланыс"}</div></div></div>}
+      {activeVideo && <VideoModal video={activeVideo} onClose={() => setActiveVideo(null)} />}
     </div>
   );
 }
 
-function Dashboard({ account, lang, theme, section, menuOpen, onSection, onMenu, onTheme, onLang, onLogout }: { account: DemoAccount; lang: Lang; theme: Theme; section: Section; menuOpen: boolean; onSection: (section: Section) => void; onMenu: () => void; onTheme: () => void; onLang: () => void; onLogout: () => void }) {
+function VideoCards({ videos, lang, onPlay }: { videos: typeof youtubeLessons; lang: Lang; onPlay: (video: (typeof youtubeLessons)[number]) => void }) { return <div className="lesson-grid video-grid">{videos.map((video, index) => <article className="lesson-card video-card" key={video.id}><button className="video-cover" onClick={() => onPlay(video)}><img src={video.thumbnail} alt="" /><span className="video-play"><Play fill="currentColor" size={24} /></span><small>{lang === "ru" ? "На казахском" : "Қазақ тілінде"}</small></button><div className="lesson-body"><span>{lang === "ru" ? `Видео ${index + 1}` : `${index + 1}-бейне`} · YouTube</span><h3>{video.title}</h3><p><Video size={15} />{video.author}</p><button className="watch-link" onClick={() => onPlay(video)}>{lang === "ru" ? "Смотреть" : "Көру"}<ArrowRight size={16} /></button></div></article>)}</div>; }
+function VideoModal({ video, onClose }: { video: (typeof youtubeLessons)[number]; onClose: () => void }) { return <div className="modal-backdrop video-backdrop"><div className="video-modal" role="dialog" aria-modal="true"><button className="modal-close" onClick={onClose}><X size={21} /></button><div className="video-frame"><iframe src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0`} title={video.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /></div><h2>{video.title}</h2><p>{video.author} · YouTube</p></div></div>; }
+
+function Dashboard({ account, lang, theme, section, menuOpen, onSection, onMenu, onTheme, onLang, onLogout, createdAccounts, onAccountsChange }: { account: Account; lang: Lang; theme: Theme; section: Section; menuOpen: boolean; onSection: (section: Section) => void; onMenu: () => void; onTheme: () => void; onLang: () => void; onLogout: () => void; createdAccounts: Account[]; onAccountsChange: (accounts: Account[]) => void }) {
   const t = copy[lang];
   const roleNav: Record<Role, [Section, typeof LayoutDashboard, string, string][]> = {
     student: [["home", LayoutDashboard, "Главная", "Басты бет"], ["chat", MessageCircle, "Чат поддержки", "Қолдау чаты"], ["lessons", Video, "Видеоуроки", "Бейнесабақтар"], ["test", ClipboardCheck, "Тест о буллинге", "Буллинг тесті"], ["library", BookOpen, "База знаний", "Білім қоры"], ["progress", BarChart3, "Мой прогресс", "Менің үлгерімім"]],
     teacher: [["home", LayoutDashboard, "Обзор класса", "Сынып шолуы"], ["classes", School, "Мои классы", "Менің сыныптарым"], ["observations", FileWarning, "Новое наблюдение", "Жаңа бақылау"], ["students", Users, "Ученики", "Оқушылар"], ["library", BookOpen, "Материалы для класса", "Сынып материалдары"], ["reports", Bell, "Уведомления", "Хабарламалар"]],
     psychologist: [["home", LayoutDashboard, "Рабочий стол", "Жұмыс үстелі"], ["reports", FileWarning, "Инциденты", "Оқиғалар"], ["students", Users, "Ученики риска", "Тәуекелдегі оқушылар"], ["cases", FileCheck2, "Кейсы", "Кейстер"], ["meetings", CalendarDays, "Встречи", "Кездесулер"], ["analytics", BarChart3, "Аналитика", "Аналитика"]],
     admin: [["home", LayoutDashboard, "Обзор школы", "Мектеп шолуы"], ["analytics", PieChart, "Аналитика", "Аналитика"], ["classes", School, "Классы", "Сыныптар"], ["users", UserCog, "Пользователи", "Пайдаланушылар"], ["students", Users, "Ученики", "Оқушылар"], ["settings", Settings, "Настройки", "Баптаулар"]],
+    site_admin: [["home", LayoutDashboard, "Обзор класса", "Сынып шолуы"], ["classes", School, "Мои классы", "Менің сыныптарым"], ["observations", FileWarning, "Новое наблюдение", "Жаңа бақылау"], ["students", Users, "Ученики", "Оқушылар"], ["library", BookOpen, "Материалы", "Материалдар"], ["reports", Bell, "Уведомления", "Хабарламалар"], ["accounts", UserPlus, "Создание аккаунтов", "Аккаунт ашу"]],
   };
   const nav = roleNav[account.role];
   const sidebarAction = account.role === "student"
@@ -308,20 +323,22 @@ function Dashboard({ account, lang, theme, section, menuOpen, onSection, onMenu,
       <div className="sidebar-top"><button className="brand sidebar-brand" onClick={() => onSection("home")}><span className="brand-mark"><ShieldCheck size={22} /></span><span>Qorgau AI</span></button><button className="sidebar-close" onClick={onMenu}><X size={20} /></button></div>
       <div className="student-mini"><div className="avatar">{account.initials}</div><div><strong>{account.name}</strong><span>{account.meta[lang]}</span></div></div>
       <nav>{nav.map(([id, Icon, ru, kk]) => <button className={section === id ? "active" : ""} onClick={() => onSection(id)} key={id}><Icon size={19} /><span>{lang === "ru" ? ru : kk}</span>{((account.role === "student" && id === "chat") || (account.role === "psychologist" && id === "reports")) && <i>{account.role === "student" ? 2 : 3}</i>}</button>)}</nav>
-      <div className="sidebar-support"><HeartHandshake size={23} /><strong>{sidebarAction[0]}</strong><span>{sidebarAction[1]}</span><button>{sidebarAction[2]}</button></div>
+      <div className="sidebar-support"><HeartHandshake size={23} /><strong>{sidebarAction[0]}</strong><span>{sidebarAction[1]}</span><button onClick={() => onSection("support")}>{sidebarAction[2]}</button></div>
       <button className="logout-button" onClick={onLogout}><LogOut size={18} />{lang === "ru" ? "Выйти" : "Шығу"}</button>
     </aside>
     {menuOpen && <button className="sidebar-scrim" onClick={onMenu} aria-label="Мәзірді жабу" />}
     <div className="dashboard-main">
-      <header className="dashboard-header"><button className="dash-menu" onClick={onMenu}><Menu size={21} /></button><div className="dash-search"><Search size={18} /><input placeholder={lang === "ru" ? "Поиск по кабинету..." : "Кабинеттен іздеу..."} /></div><div className="role-pill">{roleLabel(account.role, lang)}</div><div className="dash-actions"><button onClick={onLang}><Languages size={18} /><span>{lang === "ru" ? "RU" : "ҚАЗ"}</span></button><button onClick={onTheme}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button><Bell size={18} /><i /></button><div className="dash-avatar">{account.initials}</div></div></header>
+      <header className="dashboard-header"><button className="dash-menu" onClick={onMenu}><Menu size={21} /></button><div className="dash-search"><Search size={18} /><input placeholder={lang === "ru" ? "Поиск по кабинету..." : "Кабинеттен іздеу..."} /></div><div className="role-pill">{roleLabel(account.role, lang)}</div><div className="dash-actions"><button onClick={onLang}><Languages size={18} /><span>{lang === "ru" ? "RU" : "ҚАЗ"}</span></button><button onClick={onTheme}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button onClick={() => onSection(account.role === "student" ? "support" : "reports")}><Bell size={18} /><i /></button><div className="dash-avatar">{account.initials}</div></div></header>
       <main className="dashboard-content">
         {section === "home" && (account.role === "student" ? <DashboardHome lang={lang} t={t} onSection={onSection} /> : <StaffDashboardHome account={account} lang={lang} onSection={onSection} />)}
-        {account.role === "student" && section === "chat" && <ChatPanel lang={lang} />}
-        {account.role === "student" && section === "lessons" && <LessonsPanel lang={lang} />}
-        {account.role === "student" && section === "test" && <QuizPanel lang={lang} />}
-        {section === "library" && <LibraryPanel lang={lang} />}
+        {account.role === "student" && section === "chat" && <EnhancedChatPanel lang={lang} />}
+        {account.role === "student" && section === "lessons" && <EnhancedLessonsPanel lang={lang} />}
+        {account.role === "student" && section === "test" && <EnhancedQuizPanel lang={lang} onSection={onSection} />}
+        {section === "library" && <EnhancedLibraryPanel lang={lang} />}
         {account.role === "student" && section === "progress" && <ProgressPanel lang={lang} />}
-        {account.role !== "student" && section !== "home" && section !== "library" && <RoleWorkspace role={account.role} section={section} lang={lang} />}
+        {section === "support" && <SupportCenter account={account} lang={lang} onSection={onSection} />}
+        {account.role === "site_admin" && section === "accounts" && <AccountManager lang={lang} accounts={createdAccounts} onChange={onAccountsChange} />}
+        {account.role !== "student" && section !== "home" && section !== "library" && section !== "support" && section !== "accounts" && <RoleWorkspace role={account.role} section={section} lang={lang} />}
       </main>
     </div>
   </div>;
@@ -329,12 +346,12 @@ function Dashboard({ account, lang, theme, section, menuOpen, onSection, onMenu,
 
 function roleLabel(role: Role, lang: Lang) {
   const labels: Record<Role, { ru: string; kk: string }> = {
-    student: { ru: "Ученик", kk: "Оқушы" }, teacher: { ru: "Учитель", kk: "Мұғалім" }, psychologist: { ru: "Психолог", kk: "Психолог" }, admin: { ru: "Администратор школы", kk: "Мектеп әкімшісі" },
+    student: { ru: "Ученик", kk: "Оқушы" }, teacher: { ru: "Учитель", kk: "Мұғалім" }, psychologist: { ru: "Психолог", kk: "Психолог" }, admin: { ru: "Завуч школы", kk: "Директор орынбасары" }, site_admin: { ru: "Учитель · администратор", kk: "Мұғалім · әкімші" },
   };
   return labels[role][lang];
 }
 
-function StaffDashboardHome({ account, lang, onSection }: { account: DemoAccount; lang: Lang; onSection: (section: Section) => void }) {
+function StaffDashboardHome({ account, lang, onSection }: { account: Account; lang: Lang; onSection: (section: Section) => void }) {
   const content = {
     teacher: {
       eyebrow: lang === "ru" ? "Кабинет учителя" : "Мұғалім кабинеті",
@@ -357,9 +374,10 @@ function StaffDashboardHome({ account, lang, onSection }: { account: DemoAccount
       metrics: [["846", "Учеников", "Оқушы", "blue"], ["62", "Сотрудника", "Қызметкер", "lime"], ["31", "Класс", "Сынып", "violet"], ["89%", "Решено вовремя", "Уақтылы шешілді", "coral"]],
       actions: [["analytics", PieChart, "Аналитика школы", "Мектеп аналитикасы"], ["users", UserCog, "Пользователи", "Пайдаланушылар"], ["classes", School, "Управление классами", "Сыныптарды басқару"]] as [Section, typeof LayoutDashboard, string, string][],
     },
-  }[account.role as "teacher" | "psychologist" | "admin"];
+    site_admin: { eyebrow: lang === "ru" ? "Кабинет учителя и администратора" : "Мұғалім және әкімші кабинеті", title: lang === "ru" ? `Добрый день, ${account.name.split(" ")[0]}!` : `Қайырлы күн, ${account.name.split(" ")[0]}!`, text: lang === "ru" ? "Учебные инструменты и управление аккаунтами школы доступны в одном кабинете." : "Оқу құралдары мен мектеп аккаунттарын басқару бір кабинетте қолжетімді.", metrics: [["3", "Мои классы", "Менің сыныптарым", "blue"], ["86", "Учеников", "Оқушы", "lime"], ["4", "Наблюдения", "Бақылау", "coral"], ["+", "Создать аккаунт", "Аккаунт ашу", "violet"]], actions: [["accounts", UserPlus, "Создать аккаунт", "Аккаунт ашу"], ["classes", School, "Открыть классы", "Сыныптарды ашу"], ["observations", FileWarning, "Добавить наблюдение", "Бақылау қосу"]] as [Section, typeof LayoutDashboard, string, string][] },
+  }[account.role as "teacher" | "psychologist" | "admin" | "site_admin"];
   return <>
-    <section className={`staff-welcome role-${account.role}`}><div><span>{content.eyebrow}</span><h1>{content.title}</h1><p>{content.text}</p></div><div className="staff-hero-mark">{account.role === "teacher" ? <GraduationCap size={54} /> : account.role === "psychologist" ? <HeartHandshake size={54} /> : <School size={54} />}</div></section>
+    <section className={`staff-welcome role-${account.role}`}><div><span>{content.eyebrow}</span><h1>{content.title}</h1><p>{content.text}</p></div><div className="staff-hero-mark">{account.role === "teacher" || account.role === "site_admin" ? <GraduationCap size={54} /> : account.role === "psychologist" ? <HeartHandshake size={54} /> : <School size={54} />}</div></section>
     <section className="staff-metrics">{content.metrics.map(([value, ru, kk, tone]) => <StaffMetric key={ru} value={value} label={lang === "ru" ? ru : kk} tone={tone} />)}</section>
     <section className="staff-actions">{content.actions.map(([section, Icon, ru, kk], index) => <button onClick={() => onSection(section)} key={section}><span className={`staff-action-icon a${index + 1}`}><Icon size={21} /></span><strong>{lang === "ru" ? ru : kk}</strong><ArrowRight size={18} /></button>)}</section>
     <StaffOverview role={account.role} lang={lang} onSection={onSection} />
@@ -369,7 +387,7 @@ function StaffDashboardHome({ account, lang, onSection }: { account: DemoAccount
 function StaffMetric({ value, label, tone }: { value: string; label: string; tone: string }) { return <article className={`staff-metric ${tone}`}><span>{label}</span><strong>{value}</strong><i /></article>; }
 
 function StaffOverview({ role, lang, onSection }: { role: Role; lang: Lang; onSection: (section: Section) => void }) {
-  const data = role === "teacher" ? {
+  const data = role === "teacher" || role === "site_admin" ? {
     title: lang === "ru" ? "Последние наблюдения" : "Соңғы бақылаулар", action: "observations" as Section,
     rows: [["7 «А»", "Изменение настроения ученика", "Сегодня, 10:20", "На уточнении"], ["6 «Б»", "Конфликт на перемене", "Вчера, 14:45", "Передано"], ["8 «В»", "Исключение из группы", "12 авг., 12:10", "Новое"]],
   } : role === "psychologist" ? {
@@ -412,6 +430,7 @@ function DashboardHome({ lang, t, onSection }: { lang: Lang; t: (typeof copy)[La
 function QuickCard({ icon, title, text, onClick, tone }: { icon: ReactNode; title: string; text: string; onClick: () => void; tone: string }) { return <button className={`quick-card ${tone}`} onClick={onClick}><span>{icon}</span><div><strong>{title}</strong><p>{text}</p></div><ArrowRight size={19} /></button>; }
 function ProgressRow({ color, title, progress }: { color: string; title: string; progress: number }) { return <div className="progress-row"><span className={`progress-icon ${color}`}><BookOpen size={18} /></span><div><div><strong>{title}</strong><span>{progress}%</span></div><div className="progress-track"><i className={color} style={{ width: `${progress}%` }} /></div></div></div>; }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ChatPanel({ lang }: { lang: Lang }) {
   const [messages, setMessages] = useState([{ from: "bot", text: lang === "ru" ? "Привет! Я помогу спокойно разобраться в ситуации. Что тебя беспокоит?" : "Сәлем! Жағдайды сабырмен түсінуге көмектесемін. Сені не мазалайды?" }]);
   const [draft, setDraft] = useState("");
@@ -419,8 +438,10 @@ function ChatPanel({ lang }: { lang: Lang }) {
   return <section className="panel-page chat-page"><div className="page-title"><span>{lang === "ru" ? "Поддержка" : "Қолдау"}</span><h1>{lang === "ru" ? "Безопасный чат" : "Қауіпсіз чат"}</h1><p>{lang === "ru" ? "Здесь можно спокойно описать ситуацию и понять следующий шаг." : "Мұнда жағдайды сабырмен айтып, келесі қадамды білуге болады."}</p></div><div className="chat-layout"><div className="chat-box"><div className="chat-header"><div className="bot-avatar"><Bot size={22} /></div><div><strong>Qorgau AI Assistant</strong><span><i />{lang === "ru" ? "Готов помочь" : "Көмекке дайын"}</span></div><ShieldCheck size={20} /></div><div className="message-list">{messages.map((message, index) => <div className={`message ${message.from}`} key={`${index}-${message.text}`}><span>{message.text}</span></div>)}</div><form className="chat-input" onSubmit={send}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={lang === "ru" ? "Напиши сообщение..." : "Хабарлама жаз..."} /><button aria-label="Жіберу"><Send size={18} /></button></form></div><aside className="chat-tips"><ShieldCheck size={27} /><h3>{lang === "ru" ? "Важно знать" : "Білу маңызды"}</h3><ul><li>{lang === "ru" ? "Ты не виноват в чужой агрессии" : "Біреудің агрессиясына сен кінәлі емессің"}</li><li>{lang === "ru" ? "Не оставайся с угрозой один" : "Қауіппен жалғыз қалма"}</li><li>{lang === "ru" ? "При срочной опасности обратись к взрослому" : "Шұғыл қауіпте ересекке айт"}</li></ul></aside></div></section>;
 }
 
-function LessonsPanel({ lang }: { lang: Lang }) { const [active, setActive] = useState<number | null>(null); return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Учись защищать себя" : "Өзіңді қорғауды үйрен"}</span><h1>{lang === "ru" ? "Видеоуроки" : "Бейнесабақтар"}</h1><p>{lang === "ru" ? "Коротко, понятно и без страшных формулировок." : "Қысқа, түсінікті және қорқынышты сөздерсіз."}</p></div><div className="panel-lesson-grid">{[...lessons, { age: "5–11", title: "Как помочь другу", time: "7 мин", color: "violet" }, { age: "7–11", title: "Кибербуллинг", time: "11 мин", color: "blue" }, { age: "1–11", title: "К кому обратиться", time: "5 мин", color: "lime" }].map((lesson, index) => <article className="panel-lesson" key={`${lesson.title}-${index}`}><div className={`lesson-cover ${lesson.color}`}><span>{lesson.age}</span><button onClick={() => setActive(index)}><Play fill="currentColor" /></button>{active === index && <div className="playing"><span>{lang === "ru" ? "Урок открыт" : "Сабақ ашылды"}</span></div>}</div><div><span>{lang === "ru" ? `Модуль ${Math.floor(index / 2) + 1}` : `${Math.floor(index / 2) + 1}-модуль`}</span><h3>{lang === "ru" ? lesson.title : ["Жақсы және жаман әзіл", "Буллингті қалай танимыз", "Онлайн жеке шекара", "Досыңа қалай көмектесу керек", "Кибербуллинг", "Кімге айту керек"][index]}</h3><p><Clock3 size={14} />{lesson.time}</p></div></article>)}</div></section>; }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function LessonsPanel({ lang }: { lang: Lang }) { return <section className="panel-page"><h1>{lang === "ru" ? "Видеоуроки" : "Бейнесабақтар"}</h1></section>; }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function QuizPanel({ lang }: { lang: Lang }) {
   const questions = useMemo(() => lang === "ru" ? ["Тебя регулярно дразнят или унижают?", "Тебе угрожают или требуют что-то отдать?", "Тебя намеренно исключают из общей компании?", "Ты боишься идти в школу из-за других учеников?"] : ["Сені үнемі мазақтай ма немесе кемсітеді ме?", "Саған қорқытып, бірдеңе беруді талап ете ме?", "Сені әдейі ортадан шеттете ме?", "Басқа оқушылардан қорқып мектепке барғың келмей ме?"], [lang]);
   const [step, setStep] = useState(0); const [yes, setYes] = useState(0); const [done, setDone] = useState(false);
@@ -429,5 +450,22 @@ function QuizPanel({ lang }: { lang: Lang }) {
   return <section className="panel-page quiz-page"><div className="page-title"><span>{lang === "ru" ? "Самопроверка" : "Өзін-өзі тексеру"}</span><h1>{lang === "ru" ? "Это похоже на буллинг?" : "Бұл буллингке ұқсай ма?"}</h1><p>{lang === "ru" ? "Тест не ставит диагноз и не обвиняет. Он помогает понять, стоит ли обратиться за поддержкой." : "Тест диагноз қоймайды және айыптамайды. Ол қолдау сұрау қажет пе екенін түсінуге көмектеседі."}</p></div><div className="quiz-card">{!done ? <><div className="quiz-progress"><span>{step + 1} / {questions.length}</span><i><b style={{ width: `${((step + 1) / questions.length) * 100}%` }} /></i></div><h2>{questions[step]}</h2><div className="quiz-actions"><button onClick={() => answer(true)}>{lang === "ru" ? "Да, такое бывает" : "Иә, болады"}</button><button onClick={() => answer(false)}>{lang === "ru" ? "Нет" : "Жоқ"}</button></div></> : <div className="quiz-result"><span className="result-icon"><HeartHandshake size={32} /></span><h2>{yes >= 2 ? (lang === "ru" ? "Стоит поговорить со взрослым" : "Ересекпен сөйлескен дұрыс") : (lang === "ru" ? "Сейчас явных признаков немного" : "Қазір айқын белгілер аз")}</h2><p>{lang === "ru" ? "Твои чувства всё равно важны. Если что-то беспокоит — расскажи взрослому, которому доверяешь." : "Сезімің бәрібір маңызды. Бір нәрсе мазаласа, сенетін ересекке айт."}</p><div><button className="primary-button" onClick={reset}>{lang === "ru" ? "Пройти снова" : "Қайта өту"}</button><button className="secondary-button">{lang === "ru" ? "Открыть чат" : "Чатты ашу"}</button></div></div>}</div></section>;
 }
 
-function LibraryPanel({ lang }: { lang: Lang }) { const items = lang === "ru" ? [["Как сказать «стоп» спокойно", "Личные границы"], ["Что сохранить при кибербуллинге", "Онлайн-безопасность"], ["Как поддержать друга", "Помощь рядом"], ["К кому можно обратиться в школе", "Маршрут помощи"]] : [["«Тоқта» деп сабырмен қалай айтуға болады", "Жеке шекара"], ["Кибербуллингте нені сақтау керек", "Онлайн қауіпсіздік"], ["Досыңа қалай қолдау көрсетуге болады", "Көмек қасыңда"], ["Мектепте кімге жүгінуге болады", "Көмек жолы"]]; return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Полезно знать" : "Білу пайдалы"}</span><h1>{lang === "ru" ? "База знаний" : "Білім қоры"}</h1><p>{lang === "ru" ? "Проверенные короткие инструкции для сложных ситуаций." : "Қиын жағдайларға арналған тексерілген қысқа нұсқаулықтар."}</p></div><div className="library-grid">{items.map(([title, category], index) => <article key={title}><span className={`library-number n${index + 1}`}>0{index + 1}</span><small>{category}</small><h3>{title}</h3><button>{lang === "ru" ? "Читать" : "Оқу"}<ArrowRight size={17} /></button></article>)}</div></section>; }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function LibraryPanel({ lang }: { lang: Lang }) { return <div>{lang}</div>; }
+function EnhancedChatPanel({ lang }: { lang: Lang }) {
+  const [messages, setMessages] = useState([{ from: "bot", text: lang === "ru" ? "Привет! Расскажи, что тебя беспокоит. Я помогу выбрать спокойный следующий шаг." : "Сәлем! Сені не мазалайтынын айт. Мен қауіпсіз келесі қадамды таңдауға көмектесемін." }]); const [draft, setDraft] = useState(""); const [loading, setLoading] = useState(false);
+  async function send(event: FormEvent) { event.preventDefault(); const text = draft.trim(); if (!text || loading) return; const next = [...messages, { from: "user", text }]; setMessages(next); setDraft(""); setLoading(true); try { if (!window.puter?.ai) throw new Error(); const system = lang === "ru" ? "Ты бережный школьный помощник Qorgau AI по теме буллинга. Отвечай кратко и по возрасту. Не обвиняй, не ставь диагноз, не проси личные данные. Предлагай обратиться к доверенному взрослому или психологу. При прямой угрозе советуй безопасное место, взрослого и 112." : "Сен буллинг тақырыбындағы Qorgau AI мектеп көмекшісісің. Қысқа әрі жасына сай жауап бер. Айыптама, диагноз қойма, жеке дерек сұрама. Сенімді ересекке не психологқа айтуды ұсын. Тікелей қауіпте қауіпсіз жерге барып, ересекті шақырып, 112-ге қоңырау шалуды айт."; const response = await window.puter.ai.chat([{ role: "system", content: system }, ...next.map((item) => ({ role: item.from === "bot" ? "assistant" : "user", content: item.text }))], { model: "gemini-3.1-flash-lite" }); const data = response as { message?: { content?: string | { text?: string }[] }; text?: string }; const content = data?.message?.content; const answer = typeof response === "string" ? response : typeof content === "string" ? content : Array.isArray(content) ? content.map((part) => part.text || "").join("") : data?.text; setMessages((items) => [...items, { from: "bot", text: answer || (lang === "ru" ? "Я рядом. Расскажи немного подробнее." : "Мен осындамын. Толығырақ айтып берші.") }]); } catch { setMessages((items) => [...items, { from: "bot", text: lang === "ru" ? "AI сейчас не ответил. Попробуй снова. При срочной опасности позови взрослого или звони 112." : "AI қазір жауап бермеді. Қайта көр. Шұғыл қауіпте ересекті шақыр немесе 112-ге қоңырау шал." }]); } finally { setLoading(false); } }
+  return <section className="panel-page chat-page"><div className="page-title"><span>{lang === "ru" ? "Поддержка" : "Қолдау"}</span><h1>{lang === "ru" ? "Безопасный AI-чат" : "Қауіпсіз AI-чат"}</h1><p>{lang === "ru" ? "AI помогает сориентироваться, но не заменяет взрослого или специалиста." : "AI бағыт береді, бірақ ересекті не маманды алмастырмайды."}</p></div><div className="chat-layout"><div className="chat-box"><div className="chat-header"><div className="bot-avatar"><Bot size={22} /></div><div><strong>Qorgau AI Assistant</strong><span><i />{loading ? (lang === "ru" ? "Думает..." : "Ойланып жатыр...") : (lang === "ru" ? "Готов помочь" : "Көмекке дайын")}</span></div><ShieldCheck size={20} /></div><div className="message-list">{messages.map((message, index) => <div className={`message ${message.from}`} key={`${index}-${message.text}`}><span>{message.text}</span></div>)}{loading && <div className="message bot"><span className="typing">•••</span></div>}</div><form className="chat-input" onSubmit={send}><input value={draft} onChange={(event) => setDraft(event.target.value)} disabled={loading} placeholder={lang === "ru" ? "Напиши сообщение..." : "Хабарлама жаз..."} /><button disabled={loading}><Send size={18} /></button></form></div><aside className="chat-tips"><ShieldCheck size={27} /><h3>{lang === "ru" ? "Важно" : "Маңызды"}</h3><ul><li>{lang === "ru" ? "Не отправляй личные данные" : "Жеке деректерді жіберме"}</li><li>{lang === "ru" ? "Расскажи доверенному взрослому" : "Сенімді ересекке айт"}</li><li>{lang === "ru" ? "При срочной опасности — 112" : "Шұғыл қауіпте — 112"}</li></ul></aside></div></section>;
+}
+
+function EnhancedLessonsPanel({ lang }: { lang: Lang }) { const [active, setActive] = useState<(typeof youtubeLessons)[number] | null>(null); return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Учись защищать себя" : "Өзіңді қорғауды үйрен"}</span><h1>{lang === "ru" ? "Видеоуроки на казахском" : "Қазақ тіліндегі бейнесабақтар"}</h1><p>{lang === "ru" ? "Четыре видео о буллинге от авторов на YouTube." : "YouTube авторларының буллинг туралы төрт бейнесі."}</p></div><VideoCards videos={youtubeLessons} lang={lang} onPlay={setActive} />{active && <VideoModal video={active} onClose={() => setActive(null)} />}</section>; }
+
+function EnhancedQuizPanel({ lang, onSection }: { lang: Lang; onSection: (section: Section) => void }) { const questions = lang === "ru" ? ["Тебя регулярно дразнят или унижают?", "Тебе угрожают?", "Тебя намеренно исключают из компании?", "Ты боишься идти в школу из-за других учеников?"] : ["Сені үнемі мазақтай ма?", "Саған қорқыта ма?", "Сені әдейі ортадан шеттете ме?", "Басқа оқушылардан қорқып мектепке барғың келмей ме?"]; const [step,setStep]=useState(0); const [yes,setYes]=useState(0); const done=step>=questions.length; function answer(value:boolean){if(value)setYes((n)=>n+1);setStep((n)=>n+1);} return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Самопроверка" : "Өзін-өзі тексеру"}</span><h1>{lang === "ru" ? "Это похоже на буллинг?" : "Бұл буллингке ұқсай ма?"}</h1><p>{lang === "ru" ? "Тест не ставит диагноз и не обвиняет." : "Тест диагноз қоймайды және айыптамайды."}</p></div><div className="quiz-card">{!done?<><div className="quiz-progress"><span>{step+1} / {questions.length}</span><i><b style={{width:`${((step+1)/questions.length)*100}%`}} /></i></div><h2>{questions[step]}</h2><div className="quiz-actions"><button onClick={()=>answer(true)}>{lang === "ru" ? "Да" : "Иә"}</button><button onClick={()=>answer(false)}>{lang === "ru" ? "Нет" : "Жоқ"}</button></div></>:<div className="quiz-result"><span className="result-icon"><HeartHandshake size={32}/></span><h2>{yes>=2?(lang === "ru" ? "Стоит поговорить со взрослым" : "Ересекпен сөйлескен дұрыс"):(lang === "ru" ? "Явных признаков немного" : "Айқын белгілер аз")}</h2><p>{lang === "ru" ? "Твои чувства важны. Если что-то беспокоит — расскажи взрослому." : "Сезімің маңызды. Бір нәрсе мазаласа, ересекке айт."}</p><div><button className="primary-button" onClick={()=>{setStep(0);setYes(0);}}>{lang === "ru" ? "Снова" : "Қайта"}</button><button className="secondary-button" onClick={()=>onSection("chat")}>{lang === "ru" ? "Открыть чат" : "Чатты ашу"}</button></div></div>}</div></section>; }
+
+function EnhancedLibraryPanel({ lang }: { lang: Lang }) { const [open,setOpen]=useState<number|null>(null); const items=lang === "ru" ? [["Как сказать «стоп» спокойно","Скажи: «Мне это не нравится. Остановись». Отойди к людям и расскажи взрослому."],["Что сохранить при кибербуллинге","Сохрани скриншоты, ссылки, дату и имя аккаунта. Заблокируй отправителя и покажи взрослому."],["Как поддержать друга","Выслушай, скажи «я тебе верю» и предложи вместе обратиться к взрослому."],["К кому обратиться в школе","Классный руководитель, психолог, завуч или доверенный взрослый. При прямой угрозе — 112."]] : [["«Тоқта» деп қалай айтуға болады","«Маған бұл ұнамайды. Тоқтат» де. Адамдар бар жерге барып, ересекке айт."],["Кибербуллингте нені сақтау керек","Скриншот, сілтеме, күн және аккаунт атын сақта. Жіберушіні бұғаттап, ересекке көрсет."],["Досыңа қалай қолдау көрсетуге болады","Тыңда, «мен саған сенемін» де және ересекке бірге баруды ұсын."],["Мектепте кімге жүгінуге болады","Сынып жетекшісі, психолог, директор орынбасары немесе сенімді ересек. Тікелей қауіпте — 112."]]; return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Полезно знать" : "Білу пайдалы"}</span><h1>{lang === "ru" ? "База знаний" : "Білім қоры"}</h1></div><div className="library-grid">{items.map(([title,body],index)=><article className={open===index?"expanded":""} key={title}><span className={`library-number n${index+1}`}>0{index+1}</span><small>Qorgau AI</small><h3>{title}</h3>{open===index&&<p className="library-copy">{body}</p>}<button onClick={()=>setOpen(open===index?null:index)}>{open===index?(lang === "ru" ? "Свернуть" : "Жабу"):(lang === "ru" ? "Читать" : "Оқу")}<ArrowRight size={17}/></button></article>)}</div></section>; }
+
+function AccountManager({ lang, accounts, onChange }: { lang: Lang; accounts: Account[]; onChange: (accounts: Account[]) => void }) { const [role,setRole]=useState<Exclude<Role,"site_admin">>("student"); const [notice,setNotice]=useState(""); function create(event:FormEvent<HTMLFormElement>){event.preventDefault();const form=event.currentTarget;const data=new FormData(form);const first=String(data.get("firstName")||"").trim();const last=String(data.get("lastName")||"").trim();const login=String(data.get("login")||"").trim().toLowerCase();const password=String(data.get("password")||"");const grade=String(data.get("classNumber")||"");const letter=String(data.get("classLetter")||"").trim().toUpperCase();if(!first||!last||!login||password.length<6||(role==="student"&&(!grade||!letter))){setNotice(lang === "ru" ? "Заполните все поля; пароль — минимум 6 символов." : "Барлық өрісті толтырыңыз; құпиясөз кемінде 6 таңба.");return;}if([...demoAccounts,...accounts].some((item)=>item.login.toLowerCase()===login)){setNotice(lang === "ru" ? "Такой логин уже используется." : "Бұл логин қолданыста.");return;}const metas={student:{ru:`${grade} «${letter}» класс`,kk:`${grade} «${letter}» сынып`},teacher:{ru:"Учитель",kk:"Мұғалім"},psychologist:{ru:"Школьный психолог",kk:"Мектеп психологы"},admin:{ru:"Завуч школы",kk:"Директор орынбасары"}};onChange([...accounts,{id:crypto.randomUUID(),login,password,role,name:`${first} ${last}`,initials:`${first[0]}${last[0]}`.toUpperCase(),meta:metas[role],classNumber:grade,classLetter:letter}]);setNotice(`${lang === "ru" ? "Аккаунт создан" : "Аккаунт ашылды"}: ${login} / ${password}`);form.reset();setRole("student");} return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Только для администратора" : "Тек әкімшіге"}</span><h1>{lang === "ru" ? "Создание аккаунтов" : "Аккаунт ашу"}</h1><p>{lang === "ru" ? "Аккаунты учеников и сотрудников сохраняются в этом браузере." : "Оқушылар мен қызметкерлер аккаунттары осы браузерде сақталады."}</p></div><div className="account-layout"><form className="account-form" onSubmit={create}><div className="account-form-heading"><UserPlus size={25}/><h2>{lang === "ru" ? "Новый пользователь" : "Жаңа пайдаланушы"}</h2></div><div className="form-grid"><label>{lang === "ru" ? "Имя" : "Аты"}<input name="firstName"/></label><label>{lang === "ru" ? "Фамилия" : "Тегі"}<input name="lastName"/></label><label>{lang === "ru" ? "Роль" : "Рөлі"}<select value={role} onChange={(e)=>setRole(e.target.value as Exclude<Role,"site_admin">)}><option value="student">{lang === "ru" ? "Ученик" : "Оқушы"}</option><option value="teacher">{lang === "ru" ? "Учитель" : "Мұғалім"}</option><option value="psychologist">Психолог</option><option value="admin">{lang === "ru" ? "Завуч" : "Директор орынбасары"}</option></select></label><label>{lang === "ru" ? "Логин" : "Логин"}<input name="login"/></label><label className="form-wide">{lang === "ru" ? "Пароль" : "Құпиясөз"}<input name="password" type="text"/></label>{role==="student"&&<><label>{lang === "ru" ? "Класс" : "Сынып"}<select name="classNumber" defaultValue=""><option value="" disabled>1–11</option>{Array.from({length:11},(_,i)=><option key={i+1}>{i+1}</option>)}</select></label><label>{lang === "ru" ? "Литера" : "Әрпі"}<input name="classLetter" maxLength={2}/></label></>}</div>{notice&&<div className="account-notice"><Check size={18}/>{notice}</div>}<button className="primary-button" type="submit"><Plus size={18}/>{lang === "ru" ? "Создать" : "Ашу"}</button></form><div className="account-list"><h2>{lang === "ru" ? "Созданные аккаунты" : "Ашылған аккаунттар"}</h2><p>{lang === "ru" ? "На этом устройстве" : "Осы құрылғыда"}</p>{accounts.length===0?<div className="empty-state"><Users size={30}/>{lang === "ru" ? "Пока пусто" : "Әзірге бос"}</div>:accounts.map((item)=><div className="account-row" key={item.id}><span className="row-avatar">{item.initials}</span><div><strong>{item.name}</strong><small>{item.login} · {roleLabel(item.role,lang)}</small></div><button onClick={()=>onChange(accounts.filter((a)=>a.id!==item.id))}><X size={17}/></button></div>)}</div></div></section>; }
+
+function SupportCenter({ account, lang, onSection }: { account: Account; lang: Lang; onSection: (section: Section) => void }) { const [sent,setSent]=useState(false); function submit(event:FormEvent<HTMLFormElement>){event.preventDefault();const data=new FormData(event.currentTarget);const records=JSON.parse(localStorage.getItem("qorgau-sos-signals")||"[]");records.push({id:crypto.randomUUID(),category:data.get("category"),details:data.get("details"),createdAt:new Date().toISOString(),account:account.login});localStorage.setItem("qorgau-sos-signals",JSON.stringify(records));setSent(true);} return <section className="panel-page support-page"><div className="page-title"><span>SOS · Qorgau AI</span><h1>{lang === "ru" ? "Центр поддержки" : "Қолдау орталығы"}</h1></div><div className="emergency-card"><span className="emergency-icon"><AlertTriangle size={31}/></span><div><strong>{lang === "ru" ? "Есть непосредственная угроза жизни или здоровью?" : "Өмірге немесе денсаулыққа тікелей қауіп бар ма?"}</strong><p>{lang === "ru" ? "Отойди в безопасное место, позови взрослого и позвони в экстренную службу." : "Қауіпсіз жерге барып, ересекті шақыр және жедел қызметке қоңырау шал."}</p></div><a href="tel:112">112</a></div>{account.role==="student"?<div className="support-layout">{sent?<div className="signal-success"><ShieldCheck size={42}/><h2>{lang === "ru" ? "Сигнал сохранён" : "Белгі сақталды"}</h2><p>{lang === "ru" ? "Покажи экран доверенному взрослому. Запись сохранена на этом устройстве." : "Экранды сенімді ересекке көрсет. Жазба осы құрылғыда сақталды."}</p><button className="primary-button" onClick={()=>onSection("chat")}>{lang === "ru" ? "Открыть AI-чат" : "AI-чатты ашу"}</button></div>:<form className="support-form" onSubmit={submit}><h2>{lang === "ru" ? "Сообщить о ситуации" : "Жағдай туралы хабарлау"}</h2><label>{lang === "ru" ? "Что происходит?" : "Не болып жатыр?"}<select name="category"><option>{lang === "ru" ? "Насмешки или оскорбления" : "Мазақ немесе қорлау"}</option><option>{lang === "ru" ? "Угрозы или агрессия" : "Қорқыту немесе агрессия"}</option><option>Кибербуллинг</option></select></label><label>{lang === "ru" ? "Описание" : "Сипаттама"}<textarea name="details" rows={5}/></label><button className="sos-button" type="submit"><AlertTriangle size={20}/>{lang === "ru" ? "Отправить SOS-сигнал" : "SOS белгісін жіберу"}</button></form>}<aside className="support-routes"><h2>{lang === "ru" ? "Кому сказать" : "Кімге айту"}</h2>{[lang === "ru" ? "Классному руководителю" : "Сынып жетекшісіне",lang === "ru" ? "Школьному психологу" : "Мектеп психологына",lang === "ru" ? "Завучу или родителю" : "Директор орынбасарына не ата-анаға"].map((text,index)=><div key={text}><span>{index+1}</span>{text}</div>)}</aside></div>:<div className="support-staff"><HeartHandshake size={38}/><h2>{lang === "ru" ? "Маршрут помощи" : "Көмек жолы"}</h2><p>{lang === "ru" ? "Зафиксируйте факты, обеспечьте безопасность ребёнка и подключите психолога. При срочной угрозе звоните 112." : "Фактілерді тіркеп, баланың қауіпсіздігін қамтамасыз етіңіз және психологты қосыңыз. Шұғыл қауіпте 112-ге қоңырау шалыңыз."}</p><button className="primary-button" onClick={()=>onSection(account.role==="psychologist"?"reports":"observations")}>{lang === "ru" ? "Перейти к работе" : "Жұмысқа өту"}</button></div>}</section>; }
+
 function ProgressPanel({ lang }: { lang: Lang }) { return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Твои результаты" : "Сенің нәтижең"}</span><h1>{lang === "ru" ? "Мой прогресс" : "Менің үлгерімім"}</h1><p>{lang === "ru" ? "Небольшие шаги тоже считаются." : "Кішкентай қадамдар да маңызды."}</p></div><div className="progress-overview"><article className="score-card"><div className="score-ring"><strong>68%</strong><span>{lang === "ru" ? "пройдено" : "аяқталды"}</span></div><div><h2>{lang === "ru" ? "Отличное начало" : "Керемет бастама"}</h2><p>{lang === "ru" ? "Ты завершил 7 из 10 материалов этого уровня." : "Осы деңгейдегі 10 материалдың 7-еуін аяқтадың."}</p></div></article><article className="stats-card"><div><BookOpen /><strong>7</strong><span>{lang === "ru" ? "уроков" : "сабақ"}</span></div><div><ClipboardCheck /><strong>3</strong><span>{lang === "ru" ? "теста" : "тест"}</span></div><div><Clock3 /><strong>48</strong><span>{lang === "ru" ? "минут" : "минут"}</span></div></article></div></section>; }
