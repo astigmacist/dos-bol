@@ -37,3 +37,10 @@ test("created accounts retain role and class metadata", async () => {
   assert.match(page, /classNumber:grade,classLetter:letter/);
   assert.match(page, /\.\.\.demoAccounts,\s*\.\.\.createdAccounts/);
 });
+
+test("AI chat cannot remain stuck forever", async () => {
+  const [page] = await source();
+  assert.match(page, /Promise\.race/);
+  assert.match(page, /AI timeout/);
+  assert.match(page, /15000/);
+});
