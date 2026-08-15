@@ -39,6 +39,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 ::selection { color: #fff; background: var(--blue-2); }
 
 .site-shell { min-height: 100vh; overflow: hidden; }
+.app-loading { display: flex; min-height: 100vh; align-items: center; justify-content: center; gap: 12px; color: var(--ink); background: var(--bg); font-size: 20px; letter-spacing: -.03em; }
+.app-loading .brand-mark { animation: loading-pulse 1s ease-in-out infinite alternate; }
+@keyframes loading-pulse { to { opacity: .55; transform: scale(.94); } }
 .landing-header { position: sticky; top: 0; z-index: 30; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 32px; min-height: 76px; padding: 12px clamp(20px, 5vw, 78px); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(18px); }
 .brand { display: inline-flex; align-items: center; gap: 10px; border: 0; background: none; font-size: 19px; font-weight: 800; letter-spacing: -.03em; cursor: pointer; }
 .brand-mark { display: inline-grid; width: 40px; height: 40px; place-items: center; color: #173d80; border-radius: 13px; background: var(--lime); }
@@ -157,7 +160,7 @@ footer > div { display: flex; justify-content: flex-end; gap: 22px; color: var(-
 .login-modal input:not([type="checkbox"]) { width: 100%; min-height: 52px; padding: 0 15px; color: var(--ink); border: 1px solid var(--line); border-radius: 14px; background: var(--bg); outline: none; }
 .login-modal input:focus { border-color: var(--blue-2); }
 .form-meta { display: flex; justify-content: space-between; gap: 10px; margin: 17px 0; font-size: 12px; }
-.form-meta .checkbox { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+.form-meta > span { color: var(--muted); }
 .form-meta a, .form-meta > button { padding: 0; color: var(--blue-2); border: 0; background: none; font: inherit; font-weight: 750; cursor: pointer; }
 .dash-search > button { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; color: var(--blue-2); border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
 .form-error { display: flex; align-items: center; gap: 7px; padding: 10px 12px; color: #9f3828; border-radius: 10px; background: #fff0ec; font-size: 12px; }

@@ -60,6 +60,64 @@ const demoAccounts: Account[] = [
   { login: "bolatbekovameruert@gmail.com", password: "Meruert2026!", role: "site_admin", name: "Меруерт Болатбекова", initials: "МБ", meta: { ru: "Учитель · администратор сайта", kk: "Мұғалім · сайт әкімшісі" } },
 ];
 
+const ACCOUNTS_STORAGE_KEY = "qorgau-created-accounts-v1";
+const LEGACY_ACCOUNTS_STORAGE_KEY = "qorgau-created-accounts";
+const SESSION_STORAGE_KEY = "qorgau-active-session-v1";
+const THEME_STORAGE_KEY = "ss-theme";
+const LANG_STORAGE_KEY = "ss-lang";
+const accountRoles: Role[] = ["student", "teacher", "psychologist", "admin", "site_admin"];
+
+function readStoredAccounts(): Account[] {
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY) ?? localStorage.getItem(LEGACY_ACCOUNTS_STORAGE_KEY);
+    if (!raw) return [];
+    const records: unknown = JSON.parse(raw);
+    if (!Array.isArray(records)) return [];
+
+    return records.flatMap((record): Account[] => {
+      if (!record || typeof record !== "object") return [];
+      const value = record as Partial<Account>;
+      if (
+        typeof value.login !== "string" ||
+        typeof value.password !== "string" ||
+        typeof value.name !== "string" ||
+        !value.role ||
+        !accountRoles.includes(value.role)
+      ) return [];
+
+      const initials = typeof value.initials === "string" && value.initials
+        ? value.initials
+        : value.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+      const fallbackMeta = value.role === "student"
+        ? { ru: "Ученик", kk: "Оқушы" }
+        : { ru: roleLabel(value.role, "ru"), kk: roleLabel(value.role, "kk") };
+      const meta = value.meta && typeof value.meta.ru === "string" && typeof value.meta.kk === "string"
+        ? value.meta
+        : fallbackMeta;
+
+      return [{
+        id: typeof value.id === "string" ? value.id : crypto.randomUUID(),
+        login: value.login.trim().toLowerCase(),
+        password: value.password,
+        role: value.role,
+        name: value.name,
+        initials,
+        meta,
+        classNumber: typeof value.classNumber === "string" ? value.classNumber : undefined,
+        classLetter: typeof value.classLetter === "string" ? value.classLetter : undefined,
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function persistAccounts(accounts: Account[]) {
+  const serialized = JSON.stringify(accounts);
+  localStorage.setItem(ACCOUNTS_STORAGE_KEY, serialized);
+  localStorage.setItem(LEGACY_ACCOUNTS_STORAGE_KEY, serialized);
+}
+
 const copy = {
   kk: {
     nav: ["Жоба туралы", "Мүмкіндіктер", "Материалдар", "Қалай жұмыс істейді"],
@@ -154,7 +212,8 @@ export default function QorgauAIApp() {
   const [theme, setTheme] = useState<Theme>("light");
   const [loginOpen, setLoginOpen] = useState(false);
   const [activeAccount, setActiveAccount] = useState<Account | null>(null);
-  const [createdAccounts, setCreatedAccounts] = useState<Account[]>(() => { if (typeof window === "undefined") return []; try { return JSON.parse(localStorage.getItem("qorgau-created-accounts") || "[]"); } catch { return []; } });
+  const [createdAccounts, setCreatedAccounts] = useState<Account[]>([]);
+  const [storageReady, setStorageReady] = useState(false);
   const [activeVideo, setActiveVideo] = useState<(typeof youtubeLessons)[number] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [section, setSection] = useState<Section>("home");
@@ -162,12 +221,46 @@ export default function QorgauAIApp() {
   const t = copy[lang];
 
   useEffect(() => {
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      if (cancelled) return;
+      const accounts = readStoredAccounts();
+      setCreatedAccounts(accounts);
+      persistAccounts(accounts);
+
+      const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+      const savedLang = localStorage.getItem(LANG_STORAGE_KEY);
+      if (savedTheme === "light" || savedTheme === "dark") setTheme(savedTheme);
+      if (savedLang === "ru" || savedLang === "kk") setLang(savedLang);
+
+      const savedLogin = localStorage.getItem(SESSION_STORAGE_KEY)?.trim().toLowerCase();
+      const savedAccount = savedLogin
+        ? [...demoAccounts, ...accounts].find((account) => account.login.toLowerCase() === savedLogin)
+        : undefined;
+      if (savedAccount) setActiveAccount(savedAccount);
+      else localStorage.removeItem(SESSION_STORAGE_KEY);
+      setStorageReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.lang = lang;
-    localStorage.setItem("ss-theme", theme);
-    localStorage.setItem("ss-lang", lang);
-  }, [theme, lang]);
-  function saveCreatedAccounts(accounts: Account[]) { setCreatedAccounts(accounts); localStorage.setItem("qorgau-created-accounts", JSON.stringify(accounts)); }
+    if (storageReady) {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+      localStorage.setItem(LANG_STORAGE_KEY, lang);
+    }
+  }, [theme, lang, storageReady]);
+
+  function saveCreatedAccounts(accounts: Account[]) {
+    setCreatedAccounts(accounts);
+    persistAccounts(accounts);
+  }
 
   function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -186,7 +279,19 @@ export default function QorgauAIApp() {
     setError("");
     setLoginOpen(false);
     setSection("home");
+    localStorage.setItem(SESSION_STORAGE_KEY, account.login.toLowerCase());
     setActiveAccount(account);
+  }
+
+  function logout() {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    setActiveAccount(null);
+    setSection("home");
+    setMenuOpen(false);
+  }
+
+  if (!storageReady) {
+    return <div className="app-loading" role="status" aria-live="polite"><span className="brand-mark"><ShieldCheck size={25} /></span><strong>Qorgau AI</strong></div>;
   }
 
   if (activeAccount) {
@@ -201,7 +306,7 @@ export default function QorgauAIApp() {
         onMenu={() => setMenuOpen((value) => !value)}
         onTheme={() => setTheme(theme === "light" ? "dark" : "light")}
         onLang={() => setLang(lang === "ru" ? "kk" : "ru")}
-        onLogout={() => { setActiveAccount(null); setSection("home"); }}
+        onLogout={logout}
         createdAccounts={createdAccounts}
         onAccountsChange={saveCreatedAccounts}
       />
@@ -294,7 +399,7 @@ export default function QorgauAIApp() {
 
       <footer><a className="brand" href="#top"><span className="brand-mark"><ShieldCheck size={22} /></span><span>Qorgau AI</span></a><p>{t.footer}</p><div><a href="#about">{lang === "ru" ? "Конфиденциальность" : "Құпиялық"}</a><a href="#resources">{lang === "ru" ? "Материалы" : "Материалдар"}</a></div></footer>
 
-      {loginOpen && <div className="modal-backdrop"><div className="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="modal-close" onClick={() => setLoginOpen(false)} aria-label="Жабу"><X size={21} /></button><div className="modal-brand"><span className="brand-mark"><ShieldCheck size={23} /></span><span>Qorgau AI</span></div><div className="modal-icon"><LockKeyhole size={26} /></div><h2 id="login-title">{t.modalTitle}</h2><p>{t.modalText}</p><form onSubmit={submitLogin}><label>{t.username}<input name="login" autoComplete="username" placeholder={lang === "ru" ? "Введите логин" : "Логинді енгізіңіз"} /></label><label>{t.password}<input name="password" type="password" autoComplete="current-password" placeholder="••••••••" /></label><div className="form-meta"><label className="checkbox"><input type="checkbox" />{t.remember}</label><button type="button" onClick={() => setError(lang === "ru" ? "Обратитесь к администратору школы, чтобы восстановить доступ." : "Қолжетімділікті қалпына келтіру үшін мектеп әкімшісіне хабарласыңыз.")}>{lang === "ru" ? "Нужна помощь?" : "Көмек керек пе?"}</button></div>{error && <div className="form-error" role="alert"><CircleHelp size={17} />{error}</div>}<button className="primary-button modal-submit" type="submit">{t.enter}<ArrowRight size={18} /></button></form><div className="modal-note"><ShieldCheck size={17} />{lang === "ru" ? "Защищённое соединение" : "Қорғалған байланыс"}</div></div></div>}
+      {loginOpen && <div className="modal-backdrop"><div className="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="modal-close" onClick={() => setLoginOpen(false)} aria-label="Жабу"><X size={21} /></button><div className="modal-brand"><span className="brand-mark"><ShieldCheck size={23} /></span><span>Qorgau AI</span></div><div className="modal-icon"><LockKeyhole size={26} /></div><h2 id="login-title">{t.modalTitle}</h2><p>{t.modalText}</p><form onSubmit={submitLogin}><label>{t.username}<input name="login" autoComplete="username" placeholder={lang === "ru" ? "Введите логин" : "Логинді енгізіңіз"} /></label><label>{t.password}<input name="password" type="password" autoComplete="current-password" placeholder="••••••••" /></label><div className="form-meta"><span>{lang === "ru" ? "Вход сохранится на этом устройстве" : "Кіру осы құрылғыда сақталады"}</span><button type="button" onClick={() => setError(lang === "ru" ? "Обратитесь к администратору школы, чтобы восстановить доступ." : "Қолжетімділікті қалпына келтіру үшін мектеп әкімшісіне хабарласыңыз.")}>{lang === "ru" ? "Нужна помощь?" : "Көмек керек пе?"}</button></div>{error && <div className="form-error" role="alert"><CircleHelp size={17} />{error}</div>}<button className="primary-button modal-submit" type="submit">{t.enter}<ArrowRight size={18} /></button></form><div className="modal-note"><ShieldCheck size={17} />{lang === "ru" ? "Защищённое соединение" : "Қорғалған байланыс"}</div></div></div>}
       {activeVideo && <VideoModal video={activeVideo} onClose={() => setActiveVideo(null)} />}
     </div>
   );

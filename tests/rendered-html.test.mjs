@@ -33,9 +33,21 @@ test("student dashboard uses the authenticated account", async () => {
 
 test("created accounts retain role and class metadata", async () => {
   const [page] = await source();
-  assert.match(page, /qorgau-created-accounts/);
+  assert.match(page, /qorgau-created-accounts-v1/);
+  assert.match(page, /LEGACY_ACCOUNTS_STORAGE_KEY/);
+  assert.match(page, /readStoredAccounts/);
+  assert.match(page, /persistAccounts\(accounts\)/);
   assert.match(page, /classNumber:grade,classLetter:letter/);
   assert.match(page, /\.\.\.demoAccounts,\s*\.\.\.createdAccounts/);
+});
+
+test("active session is restored after reload and cleared on logout", async () => {
+  const [page] = await source();
+  assert.match(page, /qorgau-active-session-v1/);
+  assert.match(page, /localStorage\.setItem\(SESSION_STORAGE_KEY, account\.login\.toLowerCase\(\)\)/);
+  assert.match(page, /savedAccount.*setActiveAccount\(savedAccount\)/s);
+  assert.match(page, /function logout\(\).*localStorage\.removeItem\(SESSION_STORAGE_KEY\)/s);
+  assert.match(page, /if \(!storageReady\)/);
 });
 
 test("AI chat cannot remain stuck forever", async () => {
