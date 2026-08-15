@@ -49,7 +49,7 @@ type Lang = "kk" | "ru";
 type Theme = "light" | "dark";
 type Role = "student" | "teacher" | "psychologist" | "admin" | "site_admin";
 type Section = "home" | "chat" | "lessons" | "test" | "library" | "progress" | "classes" | "observations" | "students" | "reports" | "cases" | "meetings" | "analytics" | "users" | "settings" | "accounts" | "support";
-type Account = { id?: string; login: string; password: string; role: Role; name: string; initials: string; meta: { ru: string; kk: string }; classNumber?: string; classLetter?: string };
+type Account = { id?: string; login: string; password?: string; role: Role; name: string; initials: string; meta: { ru: string; kk: string }; classNumber?: string; classLetter?: string };
 declare global { interface Window { puter?: { ai: { chat: (messages: { role: string; content: string }[], options?: { model?: string }) => Promise<unknown> } }; } }
 
 const demoAccounts: Account[] = [
@@ -62,7 +62,6 @@ const demoAccounts: Account[] = [
 
 const ACCOUNTS_STORAGE_KEY = "qorgau-created-accounts-v1";
 const LEGACY_ACCOUNTS_STORAGE_KEY = "qorgau-created-accounts";
-const SESSION_STORAGE_KEY = "qorgau-active-session-v1";
 const THEME_STORAGE_KEY = "ss-theme";
 const LANG_STORAGE_KEY = "ss-lang";
 const accountRoles: Role[] = ["student", "teacher", "psychologist", "admin", "site_admin"];
@@ -218,28 +217,33 @@ export default function QorgauAIApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [section, setSection] = useState<Section>("home");
   const [error, setError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
   const t = copy[lang];
 
   useEffect(() => {
     let cancelled = false;
     const frame = window.requestAnimationFrame(() => {
       if (cancelled) return;
-      const accounts = readStoredAccounts();
-      setCreatedAccounts(accounts);
-      persistAccounts(accounts);
-
       const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
       const savedLang = localStorage.getItem(LANG_STORAGE_KEY);
       if (savedTheme === "light" || savedTheme === "dark") setTheme(savedTheme);
       if (savedLang === "ru" || savedLang === "kk") setLang(savedLang);
 
-      const savedLogin = localStorage.getItem(SESSION_STORAGE_KEY)?.trim().toLowerCase();
-      const savedAccount = savedLogin
-        ? [...demoAccounts, ...accounts].find((account) => account.login.toLowerCase() === savedLogin)
-        : undefined;
-      if (savedAccount) setActiveAccount(savedAccount);
-      else localStorage.removeItem(SESSION_STORAGE_KEY);
-      setStorageReady(true);
+      void (async () => {
+        try {
+          const response = await fetch("/api/auth/session", { cache: "no-store" });
+          const payload = await response.json() as { account?: Account | null };
+          if (!cancelled && response.ok && payload.account) {
+            setActiveAccount(payload.account);
+            if (payload.account.role === "site_admin") {
+              await migrateLegacyAccounts(readStoredAccounts());
+              await loadCreatedAccounts();
+            }
+          }
+        } finally {
+          if (!cancelled) setStorageReady(true);
+        }
+      })();
     });
 
     return () => {
@@ -257,12 +261,53 @@ export default function QorgauAIApp() {
     }
   }, [theme, lang, storageReady]);
 
-  function saveCreatedAccounts(accounts: Account[]) {
-    setCreatedAccounts(accounts);
-    persistAccounts(accounts);
+  async function loadCreatedAccounts() {
+    const response = await fetch("/api/accounts", { cache: "no-store" });
+    if (!response.ok) return false;
+    const payload = await response.json() as { accounts: Account[] };
+    setCreatedAccounts(payload.accounts);
+    return true;
   }
 
-  function submitLogin(event: FormEvent<HTMLFormElement>) {
+  async function migrateLegacyAccounts(accounts: Account[]) {
+    if (accounts.length === 0) return;
+    let complete = true;
+    for (const account of accounts) {
+      const response = await fetch("/api/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(account),
+      });
+      if (!response.ok && response.status !== 409) complete = false;
+    }
+    if (complete) persistAccounts([]);
+  }
+
+  async function createServerAccount(account: Account & { password: string }) {
+    const response = await fetch("/api/accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(account),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (payload.error === "login_exists") return lang === "ru" ? "Такой логин уже используется." : "Бұл логин қолданыста.";
+      return lang === "ru" ? "Не удалось сохранить аккаунт. Попробуйте ещё раз." : "Аккаунт сақталмады. Қайта көріңіз.";
+    }
+    const payload = await response.json() as { account: Account };
+    setCreatedAccounts((accounts) => [payload.account, ...accounts]);
+    return null;
+  }
+
+  async function deleteServerAccount(account: Account) {
+    if (!account.id) return false;
+    const response = await fetch(`/api/accounts?id=${encodeURIComponent(account.id)}`, { method: "DELETE" });
+    if (!response.ok) return false;
+    setCreatedAccounts((accounts) => accounts.filter((item) => item.id !== account.id));
+    return true;
+  }
+
+  async function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const login = String(data.get("login") || "").trim().toLowerCase();
@@ -271,23 +316,44 @@ export default function QorgauAIApp() {
       setError(t.error);
       return;
     }
-    const account = [...demoAccounts, ...createdAccounts].find((item) => item.login.toLowerCase() === login && item.password === password);
-    if (!account) {
-      setError(lang === "ru" ? "Неверный логин или пароль." : "Логин немесе құпиясөз қате.");
-      return;
+    setLoginLoading(true);
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ login, password }),
+      });
+      const payload = await response.json() as { account?: Account; error?: string };
+      if (!response.ok || !payload.account) {
+        setError(response.status === 503
+          ? (lang === "ru" ? "Сервис входа временно недоступен. Попробуйте ещё раз." : "Кіру қызметі уақытша қолжетімсіз. Қайта көріңіз.")
+          : (lang === "ru" ? "Неверный логин или пароль." : "Логин немесе құпиясөз қате."));
+        return;
+      }
+      setError("");
+      setLoginOpen(false);
+      setSection("home");
+      setActiveAccount(payload.account);
+      if (payload.account.role === "site_admin") {
+        await migrateLegacyAccounts(readStoredAccounts());
+        await loadCreatedAccounts();
+      }
+    } finally {
+      setLoginLoading(false);
     }
-    setError("");
-    setLoginOpen(false);
-    setSection("home");
-    localStorage.setItem(SESSION_STORAGE_KEY, account.login.toLowerCase());
-    setActiveAccount(account);
   }
 
-  function logout() {
-    localStorage.removeItem(SESSION_STORAGE_KEY);
-    setActiveAccount(null);
-    setSection("home");
-    setMenuOpen(false);
+  async function logout() {
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) return;
+      setActiveAccount(null);
+      setCreatedAccounts([]);
+      setSection("home");
+      setMenuOpen(false);
+    } catch {
+      return;
+    }
   }
 
   if (!storageReady) {
@@ -308,7 +374,8 @@ export default function QorgauAIApp() {
         onLang={() => setLang(lang === "ru" ? "kk" : "ru")}
         onLogout={logout}
         createdAccounts={createdAccounts}
-        onAccountsChange={saveCreatedAccounts}
+        onCreateAccount={createServerAccount}
+        onDeleteAccount={deleteServerAccount}
       />
     );
   }
@@ -399,7 +466,7 @@ export default function QorgauAIApp() {
 
       <footer><a className="brand" href="#top"><span className="brand-mark"><ShieldCheck size={22} /></span><span>Qorgau AI</span></a><p>{t.footer}</p><div><a href="#about">{lang === "ru" ? "Конфиденциальность" : "Құпиялық"}</a><a href="#resources">{lang === "ru" ? "Материалы" : "Материалдар"}</a></div></footer>
 
-      {loginOpen && <div className="modal-backdrop"><div className="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="modal-close" onClick={() => setLoginOpen(false)} aria-label="Жабу"><X size={21} /></button><div className="modal-brand"><span className="brand-mark"><ShieldCheck size={23} /></span><span>Qorgau AI</span></div><div className="modal-icon"><LockKeyhole size={26} /></div><h2 id="login-title">{t.modalTitle}</h2><p>{t.modalText}</p><form onSubmit={submitLogin}><label>{t.username}<input name="login" autoComplete="username" placeholder={lang === "ru" ? "Введите логин" : "Логинді енгізіңіз"} /></label><label>{t.password}<input name="password" type="password" autoComplete="current-password" placeholder="••••••••" /></label><div className="form-meta"><span>{lang === "ru" ? "Вход сохранится на этом устройстве" : "Кіру осы құрылғыда сақталады"}</span><button type="button" onClick={() => setError(lang === "ru" ? "Обратитесь к администратору школы, чтобы восстановить доступ." : "Қолжетімділікті қалпына келтіру үшін мектеп әкімшісіне хабарласыңыз.")}>{lang === "ru" ? "Нужна помощь?" : "Көмек керек пе?"}</button></div>{error && <div className="form-error" role="alert"><CircleHelp size={17} />{error}</div>}<button className="primary-button modal-submit" type="submit">{t.enter}<ArrowRight size={18} /></button></form><div className="modal-note"><ShieldCheck size={17} />{lang === "ru" ? "Защищённое соединение" : "Қорғалған байланыс"}</div></div></div>}
+      {loginOpen && <div className="modal-backdrop"><div className="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="modal-close" onClick={() => setLoginOpen(false)} aria-label="Жабу"><X size={21} /></button><div className="modal-brand"><span className="brand-mark"><ShieldCheck size={23} /></span><span>Qorgau AI</span></div><div className="modal-icon"><LockKeyhole size={26} /></div><h2 id="login-title">{t.modalTitle}</h2><p>{t.modalText}</p><form onSubmit={submitLogin}><label>{t.username}<input name="login" autoComplete="username" disabled={loginLoading} placeholder={lang === "ru" ? "Введите логин" : "Логинді енгізіңіз"} /></label><label>{t.password}<input name="password" type="password" autoComplete="current-password" disabled={loginLoading} placeholder="••••••••" /></label><div className="form-meta"><span>{lang === "ru" ? "Вход работает на всех ваших устройствах" : "Кіру барлық құрылғыда жұмыс істейді"}</span><button type="button" onClick={() => setError(lang === "ru" ? "Обратитесь к администратору школы, чтобы восстановить доступ." : "Қолжетімділікті қалпына келтіру үшін мектеп әкімшісіне хабарласыңыз.")}>{lang === "ru" ? "Нужна помощь?" : "Көмек керек пе?"}</button></div>{error && <div className="form-error" role="alert"><CircleHelp size={17} />{error}</div>}<button className="primary-button modal-submit" type="submit" disabled={loginLoading}>{loginLoading ? (lang === "ru" ? "Входим..." : "Кіру...") : t.enter}<ArrowRight size={18} /></button></form><div className="modal-note"><ShieldCheck size={17} />{lang === "ru" ? "Пароль проверяется на защищённом сервере" : "Құпиясөз қорғалған серверде тексеріледі"}</div></div></div>}
       {activeVideo && <VideoModal video={activeVideo} onClose={() => setActiveVideo(null)} />}
     </div>
   );
@@ -408,7 +475,7 @@ export default function QorgauAIApp() {
 function VideoCards({ videos, lang, onPlay }: { videos: typeof youtubeLessons; lang: Lang; onPlay: (video: (typeof youtubeLessons)[number]) => void }) { return <div className="lesson-grid video-grid">{videos.map((video, index) => <article className="lesson-card video-card" key={video.id}><button className="video-cover" onClick={() => onPlay(video)} aria-label={`${lang === "ru" ? "Смотреть" : "Көру"}: ${video.title}`}><img src={video.thumbnail} alt="" /><span className="video-play"><Play fill="currentColor" size={24} /></span><small>{lang === "ru" ? "На казахском" : "Қазақ тілінде"}</small></button><div className="lesson-body"><span>{lang === "ru" ? `Видео ${index + 1}` : `${index + 1}-бейне`} · YouTube</span><h3>{video.title}</h3><p><Video size={15} />{video.author}</p><button className="watch-link" onClick={() => onPlay(video)}>{lang === "ru" ? "Смотреть" : "Көру"}<ArrowRight size={16} /></button></div></article>)}</div>; }
 function VideoModal({ video, onClose }: { video: (typeof youtubeLessons)[number]; onClose: () => void }) { return <div className="modal-backdrop video-backdrop"><div className="video-modal" role="dialog" aria-modal="true" aria-label={video.title}><button className="modal-close" onClick={onClose} aria-label="Жабу"><X size={21} /></button><div className="video-frame"><iframe src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0`} title={video.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /></div><h2>{video.title}</h2><p>{video.author} · YouTube</p></div></div>; }
 
-function Dashboard({ account, lang, theme, section, menuOpen, onSection, onMenu, onTheme, onLang, onLogout, createdAccounts, onAccountsChange }: { account: Account; lang: Lang; theme: Theme; section: Section; menuOpen: boolean; onSection: (section: Section) => void; onMenu: () => void; onTheme: () => void; onLang: () => void; onLogout: () => void; createdAccounts: Account[]; onAccountsChange: (accounts: Account[]) => void }) {
+function Dashboard({ account, lang, theme, section, menuOpen, onSection, onMenu, onTheme, onLang, onLogout, createdAccounts, onCreateAccount, onDeleteAccount }: { account: Account; lang: Lang; theme: Theme; section: Section; menuOpen: boolean; onSection: (section: Section) => void; onMenu: () => void; onTheme: () => void; onLang: () => void; onLogout: () => void; createdAccounts: Account[]; onCreateAccount: (account: Account & { password: string }) => Promise<string | null>; onDeleteAccount: (account: Account) => Promise<boolean> }) {
   const t = copy[lang];
   const [cabinetQuery, setCabinetQuery] = useState("");
   const roleNav: Record<Role, [Section, typeof LayoutDashboard, string, string][]> = {
@@ -444,7 +511,7 @@ function Dashboard({ account, lang, theme, section, menuOpen, onSection, onMenu,
         {section === "library" && <EnhancedLibraryPanel lang={lang} />}
         {account.role === "student" && section === "progress" && <ProgressPanel lang={lang} />}
         {section === "support" && <SupportCenter account={account} lang={lang} onSection={onSection} />}
-        {account.role === "site_admin" && section === "accounts" && <AccountManager lang={lang} accounts={createdAccounts} onChange={onAccountsChange} />}
+        {account.role === "site_admin" && section === "accounts" && <AccountManager lang={lang} accounts={createdAccounts} onCreate={onCreateAccount} onDelete={onDeleteAccount} />}
         {account.role !== "student" && section !== "home" && section !== "library" && section !== "support" && section !== "accounts" && <RoleWorkspace role={account.role} section={section} lang={lang} />}
       </main>
     </div>
@@ -580,7 +647,110 @@ function EnhancedQuizPanel({ lang, onSection }: { lang: Lang; onSection: (sectio
 
 function EnhancedLibraryPanel({ lang }: { lang: Lang }) { const [open,setOpen]=useState<number|null>(null); const items=lang === "ru" ? [["Как сказать «стоп» спокойно","Скажи: «Мне это не нравится. Остановись». Отойди к людям и расскажи взрослому."],["Что сохранить при кибербуллинге","Сохрани скриншоты, ссылки, дату и имя аккаунта. Заблокируй отправителя и покажи взрослому."],["Как поддержать друга","Выслушай, скажи «я тебе верю» и предложи вместе обратиться к взрослому."],["К кому обратиться в школе","Классный руководитель, психолог, завуч или доверенный взрослый. При прямой угрозе — 112."]] : [["«Тоқта» деп қалай айтуға болады","«Маған бұл ұнамайды. Тоқтат» де. Адамдар бар жерге барып, ересекке айт."],["Кибербуллингте нені сақтау керек","Скриншот, сілтеме, күн және аккаунт атын сақта. Жіберушіні бұғаттап, ересекке көрсет."],["Досыңа қалай қолдау көрсетуге болады","Тыңда, «мен саған сенемін» де және ересекке бірге баруды ұсын."],["Мектепте кімге жүгінуге болады","Сынып жетекшісі, психолог, директор орынбасары немесе сенімді ересек. Тікелей қауіпте — 112."]]; return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Полезно знать" : "Білу пайдалы"}</span><h1>{lang === "ru" ? "База знаний" : "Білім қоры"}</h1></div><div className="library-grid">{items.map(([title,body],index)=><article className={open===index?"expanded":""} key={title}><span className={`library-number n${index+1}`}>0{index+1}</span><small>Qorgau AI</small><h3>{title}</h3>{open===index&&<p className="library-copy">{body}</p>}<button onClick={()=>setOpen(open===index?null:index)}>{open===index?(lang === "ru" ? "Свернуть" : "Жабу"):(lang === "ru" ? "Читать" : "Оқу")}<ArrowRight size={17}/></button></article>)}</div></section>; }
 
-function AccountManager({ lang, accounts, onChange }: { lang: Lang; accounts: Account[]; onChange: (accounts: Account[]) => void }) { const [role,setRole]=useState<Exclude<Role,"site_admin">>("student"); const [notice,setNotice]=useState(""); function create(event:FormEvent<HTMLFormElement>){event.preventDefault();const form=event.currentTarget;const data=new FormData(form);const first=String(data.get("firstName")||"").trim();const last=String(data.get("lastName")||"").trim();const login=String(data.get("login")||"").trim().toLowerCase();const password=String(data.get("password")||"");const grade=String(data.get("classNumber")||"");const letter=String(data.get("classLetter")||"").trim().toUpperCase();if(!first||!last||!login||password.length<6||(role==="student"&&(!grade||!letter))){setNotice(lang === "ru" ? "Заполните все поля; пароль — минимум 6 символов." : "Барлық өрісті толтырыңыз; құпиясөз кемінде 6 таңба.");return;}if([...demoAccounts,...accounts].some((item)=>item.login.toLowerCase()===login)){setNotice(lang === "ru" ? "Такой логин уже используется." : "Бұл логин қолданыста.");return;}const metas={student:{ru:`${grade} «${letter}» класс`,kk:`${grade} «${letter}» сынып`},teacher:{ru:"Учитель",kk:"Мұғалім"},psychologist:{ru:"Школьный психолог",kk:"Мектеп психологы"},admin:{ru:"Завуч школы",kk:"Директор орынбасары"}};onChange([...accounts,{id:crypto.randomUUID(),login,password,role,name:`${first} ${last}`,initials:`${first[0]}${last[0]}`.toUpperCase(),meta:metas[role],classNumber:grade,classLetter:letter}]);setNotice(`${lang === "ru" ? "Аккаунт создан" : "Аккаунт ашылды"}: ${login} / ${password}`);form.reset();setRole("student");} return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Только для администратора" : "Тек әкімшіге"}</span><h1>{lang === "ru" ? "Создание аккаунтов" : "Аккаунт ашу"}</h1><p>{lang === "ru" ? "Аккаунты учеников и сотрудников сохраняются в этом браузере." : "Оқушылар мен қызметкерлер аккаунттары осы браузерде сақталады."}</p></div><div className="account-layout"><form className="account-form" onSubmit={create}><div className="account-form-heading"><UserPlus size={25}/><h2>{lang === "ru" ? "Новый пользователь" : "Жаңа пайдаланушы"}</h2></div><div className="form-grid"><label>{lang === "ru" ? "Имя" : "Аты"}<input name="firstName"/></label><label>{lang === "ru" ? "Фамилия" : "Тегі"}<input name="lastName"/></label><label>{lang === "ru" ? "Роль" : "Рөлі"}<select value={role} onChange={(e)=>setRole(e.target.value as Exclude<Role,"site_admin">)}><option value="student">{lang === "ru" ? "Ученик" : "Оқушы"}</option><option value="teacher">{lang === "ru" ? "Учитель" : "Мұғалім"}</option><option value="psychologist">Психолог</option><option value="admin">{lang === "ru" ? "Завуч" : "Директор орынбасары"}</option></select></label><label>{lang === "ru" ? "Логин" : "Логин"}<input name="login"/></label><label className="form-wide">{lang === "ru" ? "Пароль" : "Құпиясөз"}<input name="password" type="text"/></label>{role==="student"&&<><label>{lang === "ru" ? "Класс" : "Сынып"}<select name="classNumber" defaultValue=""><option value="" disabled>1–11</option>{Array.from({length:11},(_,i)=><option key={i+1}>{i+1}</option>)}</select></label><label>{lang === "ru" ? "Литера" : "Әрпі"}<input name="classLetter" maxLength={2}/></label></>}</div>{notice&&<div className="account-notice"><Check size={18}/>{notice}</div>}<button className="primary-button" type="submit"><Plus size={18}/>{lang === "ru" ? "Создать" : "Ашу"}</button></form><div className="account-list"><h2>{lang === "ru" ? "Созданные аккаунты" : "Ашылған аккаунттар"}</h2><p>{lang === "ru" ? "На этом устройстве" : "Осы құрылғыда"}</p>{accounts.length===0?<div className="empty-state"><Users size={30}/>{lang === "ru" ? "Пока пусто" : "Әзірге бос"}</div>:accounts.map((item)=><div className="account-row" key={item.id}><span className="row-avatar">{item.initials}</span><div><strong>{item.name}</strong><small>{item.login} · {roleLabel(item.role,lang)}</small></div><button onClick={()=>onChange(accounts.filter((a)=>a.id!==item.id))} aria-label={`${lang === "ru" ? "Удалить аккаунт" : "Аккаунтты жою"}: ${item.name}`}><X size={17}/></button></div>)}</div></div></section>; }
+function AccountManager({ lang, accounts, onCreate, onDelete }: {
+  lang: Lang;
+  accounts: Account[];
+  onCreate: (account: Account & { password: string }) => Promise<string | null>;
+  onDelete: (account: Account) => Promise<boolean>;
+}) {
+  const [role, setRole] = useState<Exclude<Role, "site_admin">>("student");
+  const [notice, setNotice] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
+
+  async function create(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const first = String(data.get("firstName") || "").trim();
+    const last = String(data.get("lastName") || "").trim();
+    const login = String(data.get("login") || "").trim().toLowerCase();
+    const password = String(data.get("password") || "");
+    const grade = String(data.get("classNumber") || "");
+    const letter = String(data.get("classLetter") || "").trim().toUpperCase();
+
+    if (!first || !last || !login || password.length < 6 || (role === "student" && (!grade || !letter))) {
+      setNotice(lang === "ru" ? "Заполните все поля; пароль — минимум 6 символов." : "Барлық өрісті толтырыңыз; құпиясөз кемінде 6 таңба.");
+      return;
+    }
+    if ([...demoAccounts, ...accounts].some((item) => item.login.toLowerCase() === login)) {
+      setNotice(lang === "ru" ? "Такой логин уже используется." : "Бұл логин қолданыста.");
+      return;
+    }
+
+    const metas = {
+      student: { ru: `${grade} «${letter}» класс`, kk: `${grade} «${letter}» сынып` },
+      teacher: { ru: "Учитель", kk: "Мұғалім" },
+      psychologist: { ru: "Школьный психолог", kk: "Мектеп психологы" },
+      admin: { ru: "Завуч школы", kk: "Директор орынбасары" },
+    };
+
+    setSubmitting(true);
+    const saveError = await onCreate({
+      login,
+      password,
+      role,
+      name: `${first} ${last}`,
+      initials: `${first[0]}${last[0]}`.toUpperCase(),
+      meta: metas[role],
+      classNumber: grade || undefined,
+      classLetter: letter || undefined,
+    });
+    setSubmitting(false);
+    if (saveError) {
+      setNotice(saveError);
+      return;
+    }
+
+    setNotice(`${lang === "ru" ? "Аккаунт создан" : "Аккаунт ашылды"}: ${login} / ${password}`);
+    form.reset();
+    setRole("student");
+  }
+
+  async function remove(account: Account) {
+    setDeletingId(account.id || account.login);
+    const deleted = await onDelete(account);
+    setDeletingId("");
+    if (!deleted) setNotice(lang === "ru" ? "Не удалось удалить аккаунт." : "Аккаунт жойылмады.");
+  }
+
+  return <section className="panel-page">
+    <div className="page-title">
+      <span>{lang === "ru" ? "Только для администратора" : "Тек әкімшіге"}</span>
+      <h1>{lang === "ru" ? "Создание аккаунтов" : "Аккаунт ашу"}</h1>
+      <p>{lang === "ru" ? "Аккаунты сохраняются на защищённом сервере и работают на любом устройстве." : "Аккаунттар қорғалған серверде сақталып, барлық құрылғыда жұмыс істейді."}</p>
+    </div>
+    <div className="account-layout">
+      <form className="account-form" onSubmit={create}>
+        <div className="account-form-heading"><UserPlus size={25}/><h2>{lang === "ru" ? "Новый пользователь" : "Жаңа пайдаланушы"}</h2></div>
+        <div className="form-grid">
+          <label>{lang === "ru" ? "Имя" : "Аты"}<input name="firstName" disabled={submitting}/></label>
+          <label>{lang === "ru" ? "Фамилия" : "Тегі"}<input name="lastName" disabled={submitting}/></label>
+          <label>{lang === "ru" ? "Роль" : "Рөлі"}<select value={role} disabled={submitting} onChange={(event) => setRole(event.target.value as Exclude<Role, "site_admin">)}><option value="student">{lang === "ru" ? "Ученик" : "Оқушы"}</option><option value="teacher">{lang === "ru" ? "Учитель" : "Мұғалім"}</option><option value="psychologist">Психолог</option><option value="admin">{lang === "ru" ? "Завуч" : "Директор орынбасары"}</option></select></label>
+          <label>{lang === "ru" ? "Логин" : "Логин"}<input name="login" autoComplete="off" disabled={submitting}/></label>
+          <label className="form-wide">{lang === "ru" ? "Пароль" : "Құпиясөз"}<input name="password" type="text" autoComplete="new-password" disabled={submitting}/></label>
+          {role === "student" && <>
+            <label>{lang === "ru" ? "Класс" : "Сынып"}<select name="classNumber" defaultValue="" disabled={submitting}><option value="" disabled>1–11</option>{Array.from({ length: 11 }, (_, index) => <option key={index + 1}>{index + 1}</option>)}</select></label>
+            <label>{lang === "ru" ? "Литера" : "Әрпі"}<input name="classLetter" maxLength={2} disabled={submitting}/></label>
+          </>}
+        </div>
+        {notice && <div className="account-notice"><Check size={18}/>{notice}</div>}
+        <button className="primary-button" type="submit" disabled={submitting}><Plus size={18}/>{submitting ? (lang === "ru" ? "Сохраняем..." : "Сақталуда...") : (lang === "ru" ? "Создать" : "Ашу")}</button>
+      </form>
+      <div className="account-list">
+        <h2>{lang === "ru" ? "Созданные аккаунты" : "Ашылған аккаунттар"}</h2>
+        <p>{lang === "ru" ? "Доступны на всех устройствах" : "Барлық құрылғыда қолжетімді"}</p>
+        {accounts.length === 0
+          ? <div className="empty-state"><Users size={30}/>{lang === "ru" ? "Пока пусто" : "Әзірге бос"}</div>
+          : accounts.map((item) => <div className="account-row" key={item.id}>
+              <span className="row-avatar">{item.initials}</span>
+              <div><strong>{item.name}</strong><small>{item.login} · {roleLabel(item.role, lang)}</small></div>
+              <button type="button" disabled={deletingId === (item.id || item.login)} onClick={() => void remove(item)} aria-label={`${lang === "ru" ? "Удалить аккаунт" : "Аккаунтты жою"}: ${item.name}`}><X size={17}/></button>
+            </div>)}
+      </div>
+    </div>
+  </section>;
+}
 
 function SupportCenter({ account, lang, onSection }: { account: Account; lang: Lang; onSection: (section: Section) => void }) { const [sent,setSent]=useState(false); function submit(event:FormEvent<HTMLFormElement>){event.preventDefault();const data=new FormData(event.currentTarget);const records=JSON.parse(localStorage.getItem("qorgau-sos-signals")||"[]");records.push({id:crypto.randomUUID(),category:data.get("category"),details:data.get("details"),createdAt:new Date().toISOString(),account:account.login});localStorage.setItem("qorgau-sos-signals",JSON.stringify(records));setSent(true);} return <section className="panel-page support-page"><div className="page-title"><span>SOS · Qorgau AI</span><h1>{lang === "ru" ? "Центр поддержки" : "Қолдау орталығы"}</h1></div><div className="emergency-card"><span className="emergency-icon"><AlertTriangle size={31}/></span><div><strong>{lang === "ru" ? "Есть непосредственная угроза жизни или здоровью?" : "Өмірге немесе денсаулыққа тікелей қауіп бар ма?"}</strong><p>{lang === "ru" ? "Отойди в безопасное место, позови взрослого и позвони в экстренную службу." : "Қауіпсіз жерге барып, ересекті шақыр және жедел қызметке қоңырау шал."}</p></div><a href="tel:112">112</a></div>{account.role==="student"?<div className="support-layout">{sent?<div className="signal-success"><ShieldCheck size={42}/><h2>{lang === "ru" ? "Сигнал сохранён" : "Белгі сақталды"}</h2><p>{lang === "ru" ? "Покажи экран доверенному взрослому. Запись сохранена на этом устройстве." : "Экранды сенімді ересекке көрсет. Жазба осы құрылғыда сақталды."}</p><button className="primary-button" onClick={()=>onSection("chat")}>{lang === "ru" ? "Открыть AI-чат" : "AI-чатты ашу"}</button></div>:<form className="support-form" onSubmit={submit}><h2>{lang === "ru" ? "Сообщить о ситуации" : "Жағдай туралы хабарлау"}</h2><label>{lang === "ru" ? "Что происходит?" : "Не болып жатыр?"}<select name="category"><option>{lang === "ru" ? "Насмешки или оскорбления" : "Мазақ немесе қорлау"}</option><option>{lang === "ru" ? "Угрозы или агрессия" : "Қорқыту немесе агрессия"}</option><option>Кибербуллинг</option></select></label><label>{lang === "ru" ? "Описание" : "Сипаттама"}<textarea name="details" rows={5}/></label><button className="sos-button" type="submit"><AlertTriangle size={20}/>{lang === "ru" ? "Отправить SOS-сигнал" : "SOS белгісін жіберу"}</button></form>}<aside className="support-routes"><h2>{lang === "ru" ? "Кому сказать" : "Кімге айту"}</h2>{[lang === "ru" ? "Классному руководителю" : "Сынып жетекшісіне",lang === "ru" ? "Школьному психологу" : "Мектеп психологына",lang === "ru" ? "Завучу или родителю" : "Директор орынбасарына не ата-анаға"].map((text,index)=><div key={text}><span>{index+1}</span>{text}</div>)}</aside></div>:<div className="support-staff"><HeartHandshake size={38}/><h2>{lang === "ru" ? "Маршрут помощи" : "Көмек жолы"}</h2><p>{lang === "ru" ? "Зафиксируйте факты, обеспечьте безопасность ребёнка и подключите психолога. При срочной угрозе звоните 112." : "Фактілерді тіркеп, баланың қауіпсіздігін қамтамасыз етіңіз және психологты қосыңыз. Шұғыл қауіпте 112-ге қоңырау шалыңыз."}</p><button className="primary-button" onClick={()=>onSection(account.role==="psychologist"?"reports":"observations")}>{lang === "ru" ? "Перейти к работе" : "Жұмысқа өту"}</button></div>}</section>; }
 

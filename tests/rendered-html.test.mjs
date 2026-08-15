@@ -9,6 +9,14 @@ async function source() {
   ]);
 }
 
+async function serverSource() {
+  return Promise.all([
+    readFile(new URL("../lib/server-auth.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/auth/login/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/accounts/route.ts", import.meta.url), "utf8"),
+  ]);
+}
+
 test("contains the Qorgau AI experience and every role", async () => {
   const [page, layout] = await source();
   assert.match(layout, /title: "Qorgau AI/);
@@ -31,22 +39,27 @@ test("student dashboard uses the authenticated account", async () => {
   assert.doesNotMatch(page, /<h1>\{t\.welcome\}<\/h1>/);
 });
 
-test("created accounts retain role and class metadata", async () => {
+test("created accounts use shared server storage and retain class metadata", async () => {
   const [page] = await source();
-  assert.match(page, /qorgau-created-accounts-v1/);
-  assert.match(page, /LEGACY_ACCOUNTS_STORAGE_KEY/);
-  assert.match(page, /readStoredAccounts/);
-  assert.match(page, /persistAccounts\(accounts\)/);
-  assert.match(page, /classNumber:grade,classLetter:letter/);
-  assert.match(page, /\.\.\.demoAccounts,\s*\.\.\.createdAccounts/);
+  const [server, , accountsRoute] = await serverSource();
+  assert.match(page, /fetch\("\/api\/accounts"/);
+  assert.match(page, /migrateLegacyAccounts\(readStoredAccounts\(\)\)/);
+  assert.match(server, /CREATE TABLE IF NOT EXISTS qorgau_accounts/);
+  assert.match(server, /class_number TEXT/);
+  assert.match(server, /created_by TEXT/);
+  assert.match(accountsRoute, /classNumber/);
 });
 
-test("active session is restored after reload and cleared on logout", async () => {
+test("active session is server signed, restored after reload, and cleared on logout", async () => {
   const [page] = await source();
-  assert.match(page, /qorgau-active-session-v1/);
-  assert.match(page, /localStorage\.setItem\(SESSION_STORAGE_KEY, account\.login\.toLowerCase\(\)\)/);
-  assert.match(page, /savedAccount.*setActiveAccount\(savedAccount\)/s);
-  assert.match(page, /function logout\(\).*localStorage\.removeItem\(SESSION_STORAGE_KEY\)/s);
+  const [server, loginRoute] = await serverSource();
+  assert.match(page, /fetch\("\/api\/auth\/session"/);
+  assert.match(page, /fetch\("\/api\/auth\/logout"/);
+  assert.match(loginRoute, /verifyPassword/);
+  assert.match(server, /httpOnly: true/);
+  assert.match(server, /createHmac\("sha256"/);
+  assert.match(server, /scrypt/);
+  assert.doesNotMatch(page, /SESSION_STORAGE_KEY/);
   assert.match(page, /if \(!storageReady\)/);
 });
 
