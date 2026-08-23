@@ -199,12 +199,35 @@ const featureData = {
   ],
 } as const;
 
-const youtubeLessons = [
-  { id: "EW7vUc43N8E", title: "Буллингке қарсы бағытталған ролик", author: "Jastar Bilsin" },
-  { id: "7bD9FQR3QkA", title: "«Менің сыныбым буллингке қарсы»", author: "Мир детства" },
-  { id: "Sa1nK8yvIag", title: "Буллинг жасаған сынып", author: "БӘРІ ОСЫНДАЙ ВИДЕО" },
-  { id: "RCA_wFW-mSo", title: "Әлімжеттік, буллинг туралы мағұлмат", author: "Мектеп өмірінен" },
-].map((video) => ({ ...video, thumbnail: `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg` }));
+const videoLessons = [
+  {
+    id: "isolation",
+    title: "Изоляция — адамды ортадан оқшаулау",
+    author: "Qorgau AI",
+    duration: "0:55",
+    src: "/videos/isolation.mp4",
+    thumbnail: "/videos/isolation-poster.jpg",
+    captions: "/videos/isolation.vtt",
+  },
+  {
+    id: "cyberbullying-teens",
+    title: "Кибербуллингтің жасөспірімдер арасындағы көрінісі",
+    author: "Qorgau AI",
+    duration: "1:20",
+    src: "/videos/cyberbullying-teens.mp4",
+    thumbnail: "/videos/cyberbullying-teens-poster.jpg",
+    captions: "/videos/cyberbullying-teens.vtt",
+  },
+  {
+    id: "cyberculture",
+    title: "Кибермәдениет — интернеттегі әдеп пен жауапты қарым-қатынас",
+    author: "Qorgau AI",
+    duration: "0:48",
+    src: "/videos/cyberculture.mp4",
+    thumbnail: "/videos/cyberculture-poster.jpg",
+    captions: "/videos/cyberculture.vtt",
+  },
+] as const;
 
 export default function QorgauAIApp() {
   const [lang, setLang] = useState<Lang>("ru");
@@ -213,7 +236,7 @@ export default function QorgauAIApp() {
   const [activeAccount, setActiveAccount] = useState<Account | null>(null);
   const [createdAccounts, setCreatedAccounts] = useState<Account[]>([]);
   const [storageReady, setStorageReady] = useState(false);
-  const [activeVideo, setActiveVideo] = useState<(typeof youtubeLessons)[number] | null>(null);
+  const [activeVideo, setActiveVideo] = useState<(typeof videoLessons)[number] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [section, setSection] = useState<Section>("home");
   const [error, setError] = useState("");
@@ -456,7 +479,7 @@ export default function QorgauAIApp() {
 
         <section className="resources-section section-pad" id="resources">
           <div className="section-heading"><div><span>{lang === "ru" ? "Видеотека" : "Бейнеқор"}</span><h2>{t.resourcesTitle}</h2></div><button className="text-button" onClick={() => setLoginOpen(true)}>{lang === "ru" ? "Все материалы" : "Барлық материал"}<ArrowRight size={18} /></button></div>
-          <VideoCards videos={youtubeLessons} lang={lang} onPlay={setActiveVideo} />
+          <VideoCards videos={videoLessons} lang={lang} onPlay={setActiveVideo} />
         </section>
 
         <section className="cta-section section-pad">
@@ -472,8 +495,8 @@ export default function QorgauAIApp() {
   );
 }
 
-function VideoCards({ videos, lang, onPlay }: { videos: typeof youtubeLessons; lang: Lang; onPlay: (video: (typeof youtubeLessons)[number]) => void }) { return <div className="lesson-grid video-grid">{videos.map((video, index) => <article className="lesson-card video-card" key={video.id}><button className="video-cover" onClick={() => onPlay(video)} aria-label={`${lang === "ru" ? "Смотреть" : "Көру"}: ${video.title}`}><img src={video.thumbnail} alt="" /><span className="video-play"><Play fill="currentColor" size={24} /></span><small>{lang === "ru" ? "На казахском" : "Қазақ тілінде"}</small></button><div className="lesson-body"><span>{lang === "ru" ? `Видео ${index + 1}` : `${index + 1}-бейне`} · YouTube</span><h3>{video.title}</h3><p><Video size={15} />{video.author}</p><button className="watch-link" onClick={() => onPlay(video)}>{lang === "ru" ? "Смотреть" : "Көру"}<ArrowRight size={16} /></button></div></article>)}</div>; }
-function VideoModal({ video, onClose }: { video: (typeof youtubeLessons)[number]; onClose: () => void }) { return <div className="modal-backdrop video-backdrop"><div className="video-modal" role="dialog" aria-modal="true" aria-label={video.title}><button className="modal-close" onClick={onClose} aria-label="Жабу"><X size={21} /></button><div className="video-frame"><iframe src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0`} title={video.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /></div><h2>{video.title}</h2><p>{video.author} · YouTube</p></div></div>; }
+function VideoCards({ videos, lang, onPlay }: { videos: typeof videoLessons; lang: Lang; onPlay: (video: (typeof videoLessons)[number]) => void }) { return <div className="lesson-grid video-grid">{videos.map((video, index) => <article className="lesson-card video-card" key={video.id}><button className="video-cover" onClick={() => onPlay(video)} aria-label={`${lang === "ru" ? "Смотреть" : "Көру"}: ${video.title}`}><img src={video.thumbnail} alt="" /><span className="video-play"><Play fill="currentColor" size={24} /></span><small>{video.duration}</small></button><div className="lesson-body"><span>{lang === "ru" ? `Видео ${index + 1}` : `${index + 1}-бейне`} · MP4</span><h3>{video.title}</h3><p><Video size={15} />{video.author}</p><button className="watch-link" onClick={() => onPlay(video)}>{lang === "ru" ? "Смотреть" : "Көру"}<ArrowRight size={16} /></button></div></article>)}</div>; }
+function VideoModal({ video, onClose }: { video: (typeof videoLessons)[number]; onClose: () => void }) { return <div className="modal-backdrop video-backdrop"><div className="video-modal" role="dialog" aria-modal="true" aria-label={video.title}><button className="modal-close" onClick={onClose} aria-label="Жабу"><X size={21} /></button><div className="video-frame"><video src={video.src} poster={video.thumbnail} title={video.title} controls autoPlay playsInline><track kind="captions" src={video.captions} srcLang="kk" label="Қазақша" default /></video></div><h2>{video.title}</h2><p>{video.author} · {video.duration}</p></div></div>; }
 
 function Dashboard({ account, lang, theme, section, menuOpen, onSection, onMenu, onTheme, onLang, onLogout, createdAccounts, onCreateAccount, onDeleteAccount }: { account: Account; lang: Lang; theme: Theme; section: Section; menuOpen: boolean; onSection: (section: Section) => void; onMenu: () => void; onTheme: () => void; onLang: () => void; onLogout: () => void; createdAccounts: Account[]; onCreateAccount: (account: Account & { password: string }) => Promise<string | null>; onDeleteAccount: (account: Account) => Promise<boolean> }) {
   const t = copy[lang];
@@ -641,7 +664,7 @@ function EnhancedChatPanel({ lang }: { lang: Lang }) {
   return <section className="panel-page chat-page"><div className="page-title"><span>{lang === "ru" ? "Поддержка" : "Қолдау"}</span><h1>{lang === "ru" ? "Безопасный AI-чат" : "Қауіпсіз AI-чат"}</h1><p>{lang === "ru" ? "AI помогает сориентироваться, но не заменяет взрослого или специалиста." : "AI бағыт береді, бірақ ересекті не маманды алмастырмайды."}</p></div><div className="chat-layout"><div className="chat-box"><div className="chat-header"><div className="bot-avatar"><Bot size={22} /></div><div><strong>Qorgau AI Assistant</strong><span><i />{loading ? (lang === "ru" ? "Думает..." : "Ойланып жатыр...") : (lang === "ru" ? "Готов помочь" : "Көмекке дайын")}</span></div><ShieldCheck size={20} /></div><div className="message-list">{messages.map((message, index) => <div className={`message ${message.from}`} key={`${index}-${message.text}`}><span>{message.text}</span></div>)}{loading && <div className="message bot"><span className="typing">•••</span></div>}</div><form className="chat-input" onSubmit={send}><input value={draft} onChange={(event) => setDraft(event.target.value)} disabled={loading} aria-label={lang === "ru" ? "Сообщение для AI" : "AI-ға хабарлама"} placeholder={lang === "ru" ? "Напиши сообщение..." : "Хабарлама жаз..."} /><button disabled={loading} aria-label={lang === "ru" ? "Отправить сообщение" : "Хабарламаны жіберу"}><Send size={18} /></button></form></div><aside className="chat-tips"><ShieldCheck size={27} /><h3>{lang === "ru" ? "Важно" : "Маңызды"}</h3><ul><li>{lang === "ru" ? "Не отправляй личные данные" : "Жеке деректерді жіберме"}</li><li>{lang === "ru" ? "Расскажи доверенному взрослому" : "Сенімді ересекке айт"}</li><li>{lang === "ru" ? "При срочной опасности — 112" : "Шұғыл қауіпте — 112"}</li></ul></aside></div></section>;
 }
 
-function EnhancedLessonsPanel({ lang }: { lang: Lang }) { const [active, setActive] = useState<(typeof youtubeLessons)[number] | null>(null); return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Учись защищать себя" : "Өзіңді қорғауды үйрен"}</span><h1>{lang === "ru" ? "Видеоуроки на казахском" : "Қазақ тіліндегі бейнесабақтар"}</h1><p>{lang === "ru" ? "Четыре видео о буллинге от авторов на YouTube." : "YouTube авторларының буллинг туралы төрт бейнесі."}</p></div><VideoCards videos={youtubeLessons} lang={lang} onPlay={setActive} />{active && <VideoModal video={active} onClose={() => setActive(null)} />}</section>; }
+function EnhancedLessonsPanel({ lang }: { lang: Lang }) { const [active, setActive] = useState<(typeof videoLessons)[number] | null>(null); return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Учись защищать себя" : "Өзіңді қорғауды үйрен"}</span><h1>{lang === "ru" ? "Видеоуроки на казахском" : "Қазақ тіліндегі бейнесабақтар"}</h1><p>{lang === "ru" ? "Три коротких видео о буллинге, кибербуллинге и ответственном поведении онлайн." : "Буллинг, кибербуллинг және интернеттегі жауапты қарым-қатынас туралы үш қысқа бейне."}</p></div><VideoCards videos={videoLessons} lang={lang} onPlay={setActive} />{active && <VideoModal video={active} onClose={() => setActive(null)} />}</section>; }
 
 function EnhancedQuizPanel({ lang, onSection }: { lang: Lang; onSection: (section: Section) => void }) { const questions = lang === "ru" ? ["Тебя регулярно дразнят или унижают?", "Тебе угрожают?", "Тебя намеренно исключают из компании?", "Ты боишься идти в школу из-за других учеников?"] : ["Сені үнемі мазақтай ма?", "Саған қорқыта ма?", "Сені әдейі ортадан шеттете ме?", "Басқа оқушылардан қорқып мектепке барғың келмей ме?"]; const [step,setStep]=useState(0); const [yes,setYes]=useState(0); const done=step>=questions.length; function answer(value:boolean){if(value)setYes((n)=>n+1);setStep((n)=>n+1);} return <section className="panel-page"><div className="page-title"><span>{lang === "ru" ? "Самопроверка" : "Өзін-өзі тексеру"}</span><h1>{lang === "ru" ? "Это похоже на буллинг?" : "Бұл буллингке ұқсай ма?"}</h1><p>{lang === "ru" ? "Тест не ставит диагноз и не обвиняет." : "Тест диагноз қоймайды және айыптамайды."}</p></div><div className="quiz-card">{!done?<><div className="quiz-progress"><span>{step+1} / {questions.length}</span><i><b style={{width:`${((step+1)/questions.length)*100}%`}} /></i></div><h2>{questions[step]}</h2><div className="quiz-actions"><button onClick={()=>answer(true)}>{lang === "ru" ? "Да" : "Иә"}</button><button onClick={()=>answer(false)}>{lang === "ru" ? "Нет" : "Жоқ"}</button></div></>:<div className="quiz-result"><span className="result-icon"><HeartHandshake size={32}/></span><h2>{yes>=2?(lang === "ru" ? "Стоит поговорить со взрослым" : "Ересекпен сөйлескен дұрыс"):(lang === "ru" ? "Явных признаков немного" : "Айқын белгілер аз")}</h2><p>{lang === "ru" ? "Твои чувства важны. Если что-то беспокоит — расскажи взрослому." : "Сезімің маңызды. Бір нәрсе мазаласа, ересекке айт."}</p><div><button className="primary-button" onClick={()=>{setStep(0);setYes(0);}}>{lang === "ru" ? "Снова" : "Қайта"}</button><button className="secondary-button" onClick={()=>onSection("chat")}>{lang === "ru" ? "Открыть чат" : "Чатты ашу"}</button></div></div>}</div></section>; }
 
