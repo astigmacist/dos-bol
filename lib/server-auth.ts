@@ -28,7 +28,7 @@ type DatabaseAccount = {
   class_letter: string | null;
 };
 
-const SESSION_COOKIE = "qorgau_session";
+const SESSION_COOKIE = "dos_bol_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 const scrypt = promisify(scryptCallback);
 const seedAccounts = [
@@ -64,7 +64,7 @@ export async function verifyPassword(password: string, encoded: string) {
 async function setupDatabase() {
   const sql = database();
   await sql`
-    CREATE TABLE IF NOT EXISTS qorgau_accounts (
+    CREATE TABLE IF NOT EXISTS dos_bol_accounts (
       id TEXT PRIMARY KEY,
       login TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
@@ -83,7 +83,7 @@ async function setupDatabase() {
   await Promise.all(seedAccounts.map(async (account) => {
     const passwordHash = await hashPassword(account.password);
     await sql`
-      INSERT INTO qorgau_accounts (
+      INSERT INTO dos_bol_accounts (
         id, login, password_hash, role, name, initials, meta_ru, meta_kk, class_number, class_letter, created_by
       ) VALUES (
         ${randomUUID()}, ${account.login}, ${passwordHash}, ${account.role}, ${account.name}, ${account.initials},
@@ -119,13 +119,13 @@ function toPublic(account: DatabaseAccount): PublicAccount {
 
 export async function findAccount(login: string) {
   await ensureDatabase();
-  const rows = await database()`SELECT * FROM qorgau_accounts WHERE login = ${login.trim().toLowerCase()} LIMIT 1` as DatabaseAccount[];
+  const rows = await database()`SELECT * FROM dos_bol_accounts WHERE login = ${login.trim().toLowerCase()} LIMIT 1` as DatabaseAccount[];
   return rows[0] ?? null;
 }
 
 export async function listCreatedAccounts() {
   await ensureDatabase();
-  const rows = await database()`SELECT * FROM qorgau_accounts WHERE created_by IS NOT NULL ORDER BY created_at DESC` as DatabaseAccount[];
+  const rows = await database()`SELECT * FROM dos_bol_accounts WHERE created_by IS NOT NULL ORDER BY created_at DESC` as DatabaseAccount[];
   return rows.map(toPublic);
 }
 
@@ -144,7 +144,7 @@ export async function createAccount(input: {
   const id = randomUUID();
   const passwordHash = await hashPassword(input.password);
   const rows = await database()`
-    INSERT INTO qorgau_accounts (
+    INSERT INTO dos_bol_accounts (
       id, login, password_hash, role, name, initials, meta_ru, meta_kk, class_number, class_letter, created_by
     ) VALUES (
       ${id}, ${input.login.trim().toLowerCase()}, ${passwordHash}, ${input.role}, ${input.name}, ${input.initials},
@@ -156,7 +156,7 @@ export async function createAccount(input: {
 
 export async function deleteCreatedAccount(id: string) {
   await ensureDatabase();
-  const rows = await database()`DELETE FROM qorgau_accounts WHERE id = ${id} AND created_by IS NOT NULL RETURNING id` as Array<{ id: string }>;
+  const rows = await database()`DELETE FROM dos_bol_accounts WHERE id = ${id} AND created_by IS NOT NULL RETURNING id` as Array<{ id: string }>;
   return rows.length > 0;
 }
 

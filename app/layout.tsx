@@ -8,17 +8,17 @@ export const metadata: Metadata = {
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : "http://localhost:3000",
   ),
-  title: "Qorgau AI — безопасная школа начинается с доверия",
+  title: "Dos Bol — безопасная школа начинается с доверия",
   description:
     "Цифровое пространство для профилактики буллинга, поддержки учеников и создания безопасной школьной среды.",
   openGraph: {
-    title: "Qorgau AI",
+    title: "Dos Bol",
     description: "Каждый ученик достоин чувствовать себя в безопасности",
     images: [{ url: "/og.png", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Qorgau AI",
+    title: "Dos Bol",
     description: "Каждый ученик достоин чувствовать себя в безопасности",
     images: ["/og.png"],
   },

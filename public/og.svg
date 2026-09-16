@@ -1,0 +1,45 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#f7f4ed"/>
+  <circle cx="1070" cy="132" r="226" stroke="#f5745d" stroke-width="3" opacity=".45"/>
+  <circle cx="640" cy="487" r="302" stroke="#bfe94e" stroke-width="3" opacity=".55"/>
+  <circle cx="808" cy="208" r="244" stroke="#8d70cf" stroke-width="3" opacity=".45"/>
+  <path d="M0 48H530C620 48 685 115 676 203L650 455C643 524 584 576 515 576H0V48Z" fill="#0d3267"/>
+  <path d="M0 490C132 527 260 522 384 502C494 484 583 520 650 575H0V490Z" fill="#082753" opacity=".55"/>
+  <text x="62" y="210" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="800">Dos <tspan fill="#c9fb5f">Bol</tspan></text>
+  <text x="68" y="294" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="45" font-weight="800">Дос бол. Қорға. Қолда.</text>
+  <text x="68" y="350" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="38" font-weight="700">Каждый ученик достоин</text>
+  <text x="68" y="400" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="38" font-weight="700">чувствовать себя</text>
+  <text x="68" y="450" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="38" font-weight="700">в безопасности</text>
+  <g filter="url(#shadow)">
+    <path d="M792 88L959 168V299C959 423 884 508 792 548C700 508 625 423 625 299V168L792 88Z" fill="#fffaf0"/>
+    <path d="M792 132L918 191V301C918 397 864 465 792 501C720 465 666 397 666 301V191L792 132Z" fill="#0d3267"/>
+    <path d="M792 257C802 226 845 225 856 258C867 294 828 325 792 354C756 325 717 294 728 258C739 225 782 226 792 257Z" fill="#c9fb5f"/>
+  </g>
+  <g filter="url(#soft)">
+    <rect x="965" y="92" width="165" height="155" rx="32" fill="white"/>
+    <circle cx="1047" cy="155" r="43" fill="#7455c8"/>
+    <circle cx="1029" cy="155" r="7" fill="white"/>
+    <circle cx="1047" cy="155" r="7" fill="white"/>
+    <circle cx="1065" cy="155" r="7" fill="white"/>
+    <path d="M1020 193L1008 219L1038 201" fill="#7455c8"/>
+  </g>
+  <g filter="url(#soft)">
+    <rect x="984" y="318" width="145" height="145" rx="30" fill="white"/>
+    <path d="M1057 357C1073 357 1086 370 1086 386C1086 402 1073 415 1057 415C1041 415 1028 402 1028 386C1028 370 1041 357 1057 357Z" fill="#f5745d"/>
+    <path d="M1016 434C1039 417 1078 416 1100 434C1081 456 1035 456 1016 434Z" fill="#f5745d"/>
+  </g>
+  <g filter="url(#soft)">
+    <rect x="910" y="474" width="170" height="112" rx="28" fill="white"/>
+    <path d="M995 506L1050 529L995 552L940 529L995 506Z" fill="#c9fb5f"/>
+    <path d="M957 542V563C978 579 1014 579 1033 563V542L995 558L957 542Z" fill="#c9fb5f"/>
+    <text x="951" y="574" fill="#0d3267" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="800">1–11</text>
+  </g>
+  <defs>
+    <filter id="shadow" x="589" y="56" width="406" height="540" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#061932" flood-opacity=".26"/>
+    </filter>
+    <filter id="soft" x="880" y="64" width="284" height="556" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#061932" flood-opacity=".18"/>
+    </filter>
+  </defs>
+</svg>

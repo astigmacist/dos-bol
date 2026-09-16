@@ -17,9 +17,11 @@ async function serverSource() {
   ]);
 }
 
-test("contains the Qorgau AI experience and every role", async () => {
+test("contains the Dos Bol experience and every role", async () => {
   const [page, layout] = await source();
-  assert.match(layout, /title: "Qorgau AI/);
+  const [server] = await serverSource();
+  assert.match(layout, /title: "Dos Bol/);
+  assert.match(page, /Dos Bol/);
   assert.match(page, /student.*Student123!/s);
   assert.match(page, /teacher.*Teacher123!/s);
   assert.match(page, /psychologist.*Psycho123!/s);
@@ -27,6 +29,7 @@ test("contains the Qorgau AI experience and every role", async () => {
   assert.match(page, /site_admin/);
   assert.match(page, /bolatbekovameruert@gmail\.com/);
   assert.doesNotMatch(page, /SafeSchool/i);
+  assert.doesNotMatch(`${page}\n${layout}\n${server}`, new RegExp(["Qor", "gau"].join(""), "i"));
 });
 
 test("student dashboard uses the authenticated account", async () => {
@@ -44,7 +47,7 @@ test("created accounts use shared server storage and retain class metadata", asy
   const [server, , accountsRoute] = await serverSource();
   assert.match(page, /fetch\("\/api\/accounts"/);
   assert.match(page, /migrateLegacyAccounts\(readStoredAccounts\(\)\)/);
-  assert.match(server, /CREATE TABLE IF NOT EXISTS qorgau_accounts/);
+  assert.match(server, /CREATE TABLE IF NOT EXISTS dos_bol_accounts/);
   assert.match(server, /class_number TEXT/);
   assert.match(server, /created_by TEXT/);
   assert.match(accountsRoute, /classNumber/);
