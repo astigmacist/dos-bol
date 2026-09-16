@@ -3,11 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : "http://localhost:3000",
-  ),
+  metadataBase: new URL("https://dos-bol.vercel.app"),
   title: "Dos Bol — безопасная школа начинается с доверия",
   description:
     "Цифровое пространство для профилактики буллинга, поддержки учеников и создания безопасной школьной среды.",
