@@ -14,6 +14,7 @@ async function serverSource() {
     readFile(new URL("../lib/server-auth.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/login/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/accounts/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/ai/chat/route.ts", import.meta.url), "utf8"),
   ]);
 }
 
@@ -29,6 +30,7 @@ test("contains the Dos Bol experience and every role", async () => {
   assert.match(page, /site_admin/);
   assert.match(page, /bolatbekovameruert@gmail\.com/);
   assert.doesNotMatch(page, /SafeSchool/i);
+  assert.doesNotMatch(`${page}\n${layout}`, /puter/i);
   assert.doesNotMatch(`${page}\n${layout}\n${server}`, new RegExp(["Qor", "gau"].join(""), "i"));
 });
 
@@ -68,7 +70,12 @@ test("active session is server signed, restored after reload, and cleared on log
 
 test("AI chat cannot remain stuck forever", async () => {
   const [page] = await source();
+  const [, , , aiRoute] = await serverSource();
   assert.match(page, /Promise\.race/);
+  assert.match(page, /fetch\("\/api\/ai\/chat"/);
   assert.match(page, /AI timeout/);
   assert.match(page, /15000/);
+  assert.match(aiRoute, /currentAccount/);
+  assert.match(aiRoute, /fallbackAnswer/);
+  assert.match(aiRoute, /text\.pollinations\.ai\/openai/);
 });
