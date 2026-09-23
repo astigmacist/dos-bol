@@ -78,4 +78,8 @@ test("AI chat cannot remain stuck forever", async () => {
   assert.match(aiRoute, /currentAccount/);
   assert.match(aiRoute, /fallbackAnswer/);
   assert.match(aiRoute, /text\.pollinations\.ai\/openai/);
+  assert.match(aiRoute, /attempt < 2/);
+  assert.match(aiRoute, /previousAssistant/);
+  assert.match(aiRoute, /шарша/);
+  assert.match(aiRoute, /мазақ/);
 });
