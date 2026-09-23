@@ -30,7 +30,6 @@ import {
   Plus,
   Search,
   Send,
-  Shield,
   ShieldCheck,
   School,
   Settings,
@@ -43,7 +42,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Lang = "kk" | "ru";
 type Theme = "light" | "dark";
@@ -407,8 +406,8 @@ export default function DosBolApp() {
     <div className="site-shell">
       <header className="landing-header">
         <a className="brand" href="#top" aria-label="Dos Bol басты бет">
-          <span className="brand-mark"><ShieldCheck size={22} /></span>
-          <span>Dos Bol</span>
+          <span className="brand-mark"><HeartHandshake size={23} /></span>
+          <span className="brand-copy"><strong>Dos Bol</strong><small>{lang === "ru" ? "Ты не один" : "Сен жалғыз емессің"}</small></span>
         </a>
         <nav className="desktop-nav" aria-label="Негізгі навигация">
           {t.nav.map((label, index) => <a href={["#about", "#features", "#resources", "#how"][index]} key={label}>{label}</a>)}
@@ -438,12 +437,29 @@ export default function DosBolApp() {
             </div>
           </div>
           <div className="hero-visual" aria-label="Dos Bol қолдау жүйесі">
-            <div className="orbit orbit-one" />
-            <div className="orbit orbit-two" />
-            <div className="hero-shield"><Shield size={82} strokeWidth={1.5} /><Sparkles className="shield-spark" size={25} /></div>
+            <img src="/dos-bol-friends.webp" alt={lang === "ru" ? "Школьники поддерживают друг друга" : "Оқушылар бір-біріне қолдау көрсетеді"} />
             <div className="floating-card card-help"><HeartHandshake size={21} /><span>{lang === "ru" ? "Помощь рядом" : "Көмек қасыңда"}</span></div>
             <div className="floating-card card-safe"><Check size={20} /><span>{lang === "ru" ? "Тебя услышат" : "Сені тыңдайды"}</span></div>
-            <div className="floating-card card-grade"><GraduationCap size={21} /><span>{t.grades}</span></div>
+            <div className="hero-sun" aria-hidden="true"><Sun size={29} /></div>
+          </div>
+        </section>
+
+        <section className="help-menu-section" aria-labelledby="help-menu-title">
+          <div className="help-menu-heading">
+            <span>{lang === "ru" ? "Начни с главного" : "Ең маңыздысынан баста"}</span>
+            <h2 id="help-menu-title">{lang === "ru" ? "Что тебе нужно сейчас?" : "Қазір саған не қажет?"}</h2>
+            <p>{lang === "ru" ? "Выбери знакомую ситуацию — мы покажем безопасный следующий шаг." : "Таныс жағдайды таңда — біз қауіпсіз келесі қадамды көрсетеміз."}</p>
+          </div>
+          <div className="help-menu-grid">
+            {([
+              [CircleHelp, lang === "ru" ? "Что такое буллинг?" : "Бұл буллинг пе?", "sky", "#about"],
+              [MessageCircle, lang === "ru" ? "Со мной это случилось" : "Бұл менімен болды", "mint", "login"],
+              [Sparkles, lang === "ru" ? "Что мне делать?" : "Не істеуім керек?", "sunny", "#how"],
+              [Users, lang === "ru" ? "К кому обратиться?" : "Кімнен көмек сұраймын?", "lavender", "login"],
+              [Video, lang === "ru" ? "Кибербуллинг" : "Кибербуллинг", "aqua", "#resources"],
+              [BookOpen, lang === "ru" ? "Истории и материалы" : "Оқиғалар мен материалдар", "cream", "#resources"],
+              [AlertTriangle, lang === "ru" ? "Нужна срочная помощь" : "Шұғыл көмек керек", "rose", "login"],
+            ] as const).map(([Icon, label, tone, target]) => <button className={`help-menu-item ${tone}`} key={label} onClick={() => target === "login" ? setLoginOpen(true) : document.querySelector(target)?.scrollIntoView({ behavior: "smooth" })}><span><Icon size={22} /></span><strong>{label}</strong><ArrowRight size={19} /></button>)}
           </div>
         </section>
 
@@ -630,10 +646,34 @@ function SettingsWorkspace({ lang }: { lang: Lang }) { return <div className="se
 function DashboardHome({ account, lang, t, onSection }: { account: Account; lang: Lang; t: (typeof copy)[Lang]; onSection: (section: Section) => void }) {
   const [mood, setMood] = useState("");
   const firstName = account.name.trim().split(/\s+/)[0] || account.name;
-  return <><section className="dash-welcome"><div><span>{lang === "ru" ? "Личный кабинет" : "Жеке кабинет"}</span><h1>{lang === "ru" ? `Добрый день, ${firstName}!` : `Қайырлы күн, ${firstName}!`}</h1><p>{t.welcomeText}</p></div><div className="mood-widget"><span>{mood ? (lang === "ru" ? "Спасибо, настроение отмечено" : "Рақмет, көңіл-күй белгіленді") : (lang === "ru" ? "Как ты сегодня?" : "Бүгін көңіл-күйің қалай?")}</span><div>{["😄", "🙂", "😐", "😕", "😔"].map((item) => <button className={mood === item ? "selected" : ""} onClick={() => setMood(item)} aria-label={`${lang === "ru" ? "Настроение" : "Көңіл-күй"}: ${item}`} aria-pressed={mood === item} key={item}>{item}</button>)}</div></div></section><section className="quick-grid"><QuickCard icon={<MessageCircle />} title={lang === "ru" ? "Поговорить" : "Сөйлесу"} text={lang === "ru" ? "Безопасный чат поддержки" : "Қауіпсіз қолдау чаты"} onClick={() => onSection("chat")} tone="blue" /><QuickCard icon={<Play />} title={lang === "ru" ? "Смотреть урок" : "Сабақты көру"} text={lang === "ru" ? "Видео о буллинге на казахском" : "Буллинг туралы қазақша бейне"} onClick={() => onSection("lessons")} tone="lime" /><QuickCard icon={<ClipboardCheck />} title={lang === "ru" ? "Пройти тест" : "Тест тапсыру"} text={lang === "ru" ? "Разберись в ситуации" : "Жағдайды түсініп ал"} onClick={() => onSection("test")} tone="coral" /></section><section className="dash-columns"><div className="dashboard-card"><div className="card-heading"><div><span>{lang === "ru" ? "Твой путь" : "Сенің жолың"}</span><h2>{lang === "ru" ? "Прогресс обучения" : "Оқу барысы"}</h2></div><button onClick={() => onSection("progress")}>{lang === "ru" ? "Подробнее" : "Толығырақ"}<ArrowRight size={16} /></button></div><div className="progress-list"><ProgressRow color="blue" title={lang === "ru" ? "Что такое буллинг" : "Буллинг деген не"} progress={100} /><ProgressRow color="lime" title={lang === "ru" ? "Личные границы" : "Жеке шекара"} progress={65} /><ProgressRow color="coral" title={lang === "ru" ? "Безопасность онлайн" : "Онлайн қауіпсіздік"} progress={20} /></div></div><div className="dashboard-card"><div className="card-heading"><div><span>{lang === "ru" ? "Рекомендация" : "Ұсыныс"}</span><h2>{lang === "ru" ? "Материал дня" : "Күн материалы"}</h2></div><Sparkles size={21} /></div><div className="daily-card"><div className="daily-icon"><ShieldCheck size={28} /></div><h3>{lang === "ru" ? "5 фраз, чтобы спокойно поставить границу" : "Шекара қоюға арналған 5 сөйлем"}</h3><p>4 {lang === "ru" ? "мин чтения" : "мин оқу"}</p><button onClick={() => onSection("library")}>{lang === "ru" ? "Открыть" : "Ашу"}<ArrowRight size={16} /></button></div></div></section></>;
+  const routes = [
+    [CircleHelp, lang === "ru" ? "Что такое буллинг?" : "Бұл буллинг пе?", lang === "ru" ? "Понять признаки" : "Белгілерін түсіну", "library", "sky"],
+    [MessageCircle, lang === "ru" ? "Со мной это случилось" : "Бұл менімен болды", lang === "ru" ? "Поговорить безопасно" : "Қауіпсіз сөйлесу", "chat", "mint"],
+    [Sparkles, lang === "ru" ? "Что мне делать?" : "Не істеуім керек?", lang === "ru" ? "Выбрать следующий шаг" : "Келесі қадамды таңдау", "test", "sunny"],
+    [Users, lang === "ru" ? "К кому обратиться?" : "Кімнен көмек сұраймын?", lang === "ru" ? "Найти взрослого" : "Ересекті табу", "support", "lavender"],
+    [Video, lang === "ru" ? "Кибербуллинг" : "Кибербуллинг", lang === "ru" ? "Посмотреть уроки" : "Сабақтарды көру", "lessons", "aqua"],
+    [BookOpen, lang === "ru" ? "Полезные материалы" : "Пайдалы материалдар", lang === "ru" ? "Учиться в своём темпе" : "Өз қарқыныңмен оқу", "library", "cream"],
+    [AlertTriangle, lang === "ru" ? "Нужна срочная помощь" : "Шұғыл көмек керек", lang === "ru" ? "Отправить сигнал" : "Белгі жіберу", "support", "rose"],
+  ] as const;
+
+  return <>
+    <section className="dash-welcome student-welcome">
+      <div className="student-welcome-copy"><span>{lang === "ru" ? "Твоё безопасное пространство" : "Сенің қауіпсіз кеңістігің"}</span><h1>{lang === "ru" ? `Добрый день, ${firstName}!` : `Қайырлы күн, ${firstName}!`}</h1><p>{t.welcomeText}</p></div>
+      <div className="mood-widget"><span>{mood ? (lang === "ru" ? "Спасибо, что поделился" : "Бөліскеніңе рақмет") : (lang === "ru" ? "Как ты сегодня?" : "Бүгін көңіл-күйің қалай?")}</span><div>{["😄", "🙂", "😐", "😕", "😔"].map((item) => <button className={mood === item ? "selected" : ""} onClick={() => setMood(item)} aria-label={`${lang === "ru" ? "Настроение" : "Көңіл-күй"}: ${item}`} aria-pressed={mood === item} key={item}>{item}</button>)}</div></div>
+    </section>
+    <section className="student-route-layout">
+      <div className="student-route-card">
+        <div className="card-heading"><div><span>{lang === "ru" ? "Я рядом" : "Мен қасыңдамын"}</span><h2>{lang === "ru" ? "С чего хочешь начать?" : "Неден бастағың келеді?"}</h2></div><HeartHandshake size={24} /></div>
+        <div className="student-route-list">{routes.map(([Icon, title, text, target, tone]) => <button className={`student-route ${tone}`} key={title} onClick={() => onSection(target)}><span><Icon size={21} /></span><div><strong>{title}</strong><small>{text}</small></div><ArrowRight size={19} /></button>)}</div>
+      </div>
+      <aside className="student-side-stack">
+        <div className="student-illustration-card"><img src="/dos-bol-friends.webp" alt="" /><div><strong>{lang === "ru" ? "Ты не один" : "Сен жалғыз емессің"}</strong><span>{lang === "ru" ? "Помощь всегда рядом" : "Көмек әрдайым қасыңда"}</span></div></div>
+        <div className="dashboard-card progress-mini"><div className="card-heading"><div><span>{lang === "ru" ? "Твой путь" : "Сенің жолың"}</span><h2>{lang === "ru" ? "Прогресс" : "Оқу барысы"}</h2></div><button onClick={() => onSection("progress")}><ArrowRight size={17} /></button></div><ProgressRow color="blue" title={lang === "ru" ? "Что такое буллинг" : "Буллинг деген не"} progress={100} /><ProgressRow color="lime" title={lang === "ru" ? "Личные границы" : "Жеке шекара"} progress={65} /></div>
+      </aside>
+    </section>
+  </>;
 }
 
-function QuickCard({ icon, title, text, onClick, tone }: { icon: ReactNode; title: string; text: string; onClick: () => void; tone: string }) { return <button className={`quick-card ${tone}`} onClick={onClick}><span>{icon}</span><div><strong>{title}</strong><p>{text}</p></div><ArrowRight size={19} /></button>; }
 function ProgressRow({ color, title, progress }: { color: string; title: string; progress: number }) { return <div className="progress-row"><span className={`progress-icon ${color}`}><BookOpen size={18} /></span><div><div><strong>{title}</strong><span>{progress}%</span></div><div className="progress-track"><i className={color} style={{ width: `${progress}%` }} /></div></div></div>; }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
