@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import test from "node:test";
 
 async function source() {
@@ -82,4 +82,12 @@ test("AI chat cannot remain stuck forever", async () => {
   assert.match(aiRoute, /previousAssistant/);
   assert.match(aiRoute, /шарша/);
   assert.match(aiRoute, /мазақ/);
+});
+
+test("all published video lessons include playable MP4 assets", async () => {
+  const names = ["isolation", "cyberbullying-teens", "cyberculture"];
+  for (const name of names) {
+    const info = await stat(new URL(`../public/videos/${name}.mp4`, import.meta.url));
+    assert.ok(info.size > 1_000_000, `${name}.mp4 should contain the complete video`);
+  }
 });

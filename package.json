@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/verify-video-assets.mjs",
     "build": "next build",
     "start": "next start",
     "test": "node --test tests/rendered-html.test.mjs",
